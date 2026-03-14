@@ -1,7 +1,7 @@
 import type {
   CreateUserRequest,
   LoginRequest
-} from "../dto/user.js";
+} from "../schemas/user.js";
 import {User} from "../models/User.js";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";

@@ -1,5 +1,6 @@
-import {Model} from "sequelize-typescript";
+import {HasMany, Model} from "sequelize-typescript";
 import {Column, DataType, Table} from "sequelize-typescript";
+import {Bill} from "./Bill.js";
 
 @Table({
   tableName: "users",
@@ -21,12 +22,14 @@ export class User extends Model {
   lastName!: string;
 
   @Column({
-    type: DataType.DOUBLE
+    type: DataType.DECIMAL(10, 2),
+    field: "wage",
   })
   wage!: number;
 
   @Column({
     type: DataType.STRING,
+    field: "email",
     allowNull: false,
     unique: true,
   })
@@ -34,7 +37,14 @@ export class User extends Model {
 
   @Column({
     type: DataType.TEXT,
+    field: "password",
     allowNull: false,
   })
   password!: string;
+
+  @HasMany(() => Bill, {
+    foreignKey: "user_id",
+    onDelete: "CASCADE"
+  })
+  bills!: Bill[];
 }

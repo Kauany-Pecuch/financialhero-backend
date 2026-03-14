@@ -1,6 +1,7 @@
-import { Sequelize } from "sequelize-typescript";
+import {type Model, type ModelCtor, Sequelize} from "sequelize-typescript";
 import dotenv from "dotenv";
 import {User} from "./models/User.js";
+import {Bill} from "./models/Bill.js";
 
 dotenv.config();
 
@@ -12,6 +13,11 @@ if (!DB_NAME || !DB_USER || !DB_PASSWORD || !DB_HOST || !DB_PORT) {
   );
 }
 
+const models: ModelCtor<Model<any, any>>[] = [
+  User,
+  Bill
+]
+
 const sequelize = new Sequelize({
   database: DB_NAME,
   username: DB_USER,
@@ -19,7 +25,7 @@ const sequelize = new Sequelize({
   host: DB_HOST,
   port: DB_PORT ? Number(DB_PORT) : 5432,
   dialect: "postgres",
-  models: [User],
+  models: models,
   logging: false
 });
 
