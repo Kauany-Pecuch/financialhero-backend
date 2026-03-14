@@ -1,4 +1,7 @@
-import type {CreateUserRequest} from "../dto/user.js";
+import type {
+  CreateUserRequest,
+  LoginRequest
+} from "../dto/user.js";
 import {User} from "../models/User.js";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
@@ -12,7 +15,7 @@ export default class UserService {
 
   async createUser(
     creationRequest: CreateUserRequest
-  ) {
+  ): Promise<{ token: string }> {
     const { password, email, lastName, firstName, wage } = creationRequest;
 
     const existingUser = await this.findUserByEmail(email);
@@ -36,7 +39,25 @@ export default class UserService {
     return {token};
   }
 
-  private findUserByEmail(email: string): Promise<User | null> {
+  async login(
+    loginRequest: LoginRequest
+  ): Promise<{ token: string }> {
+    const { password = '', email = '' } = loginRequest;
+
+    const user = await this.findUserByEmail(email);
+    if (!user) throw new Error("Email ou senha incorretos");
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) throw new Error("Email ou senha incorretos");
+
+    const token = this.createToken(user);
+
+    return {token};
+  }
+
+  private async findUserByEmail(email: string): Promise<User | null> {
+    if (!email) return null;
+
     return User.findOne({
       where: { email }
     })

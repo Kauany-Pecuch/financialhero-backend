@@ -5,3 +5,8 @@ export interface CreateUserRequest {
   password: string;
   wage?: number;
 }
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
