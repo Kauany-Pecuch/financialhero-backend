@@ -1,7 +1,5 @@
 import { Sequelize } from "sequelize-typescript";
 import dotenv from "dotenv";
-// import path from "path";
-// import {fileURLToPath} from "node:url";
 import {User} from "./models/User.js";
 
 dotenv.config();
@@ -13,9 +11,6 @@ if (!DB_NAME || !DB_USER || !DB_PASSWORD || !DB_HOST || !DB_PORT) {
     "Variáveis de ambiente obrigatórias não definidas para conexão com o banco."
   );
 }
-
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = path.dirname(__filename);
 
 const sequelize = new Sequelize({
   database: DB_NAME,
