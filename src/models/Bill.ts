@@ -1,6 +1,7 @@
-import {BelongsTo, Column, DataType, ForeignKey, Model, Table} from "sequelize-typescript";
-import {BillType} from "../schemas/enums.js";
+import {BelongsTo, Column, DataType, ForeignKey, HasMany, Model, Table} from "sequelize-typescript";
+import {BillType} from "../schemas/bill/enums.js";
 import {User} from "./User.js";
+import {FileUpload} from "./FileUpload.js";
 
 @Table({
   tableName: "bill",
@@ -55,5 +56,9 @@ export class Bill extends Model {
   })
   user!: User;
 
-  //TODO vincular com arquivos
+  @HasMany(() => FileUpload, {
+    foreignKey: "bill_id",
+    onDelete: "CASCADE"
+  })
+  fileUploads!: FileUpload[];
 }
