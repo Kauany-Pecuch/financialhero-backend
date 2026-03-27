@@ -1,6 +1,11 @@
-import type {CreateBillRequest} from "../schemas/bill/schema.js";
 import {Bill} from "../models/Bill.js";
 import {User} from "../models/User.js";
+import type {CreateBillRequest} from "../types/bill/bill-types.js";
+import type {PagedResponse} from "../types/requests.js";
+import BillRepository from "../repository/BillRepository.js";
+import {createPagedResponse} from "../shared/builders.js";
+
+const billRepository = new BillRepository();
 
 export default class BillService {
 
@@ -21,12 +26,48 @@ export default class BillService {
     const { billType, expirationDate, name, amount, description } = creationRequest;
 
     return await Bill.create({
-      billType: billType,
+      type: billType,
       description: description,
       amount: amount,
       name: name,
       expirationDate: expirationDate,
-      user: user
+      userId: user.id
+    });
+  }
+
+  async listBill({
+    userId,
+    page = 0,
+    size = 10,
+    sort = "created_at,desc"
+  } : {
+    userId: string,
+    page: number,
+    size: number,
+    sort: string | null | undefined
+  }): Promise<PagedResponse<Bill>> {
+    const [resultList, totalItems] = await Promise.all([
+        billRepository.findAllBillsByUserId({userId, page, size, sort}),
+        billRepository.countItemsByUserId(userId)
+    ]);
+
+    let direction = '';
+    let property = '';
+    if (sort) {
+      const [separatedProperty, separatedDirection] = sort.split(",");
+
+      if (!separatedProperty || !separatedDirection) {
+        throw new Error("Invalid sort format");
+      }
+
+      direction = separatedDirection;
+      property = separatedProperty;
+    }
+
+    return createPagedResponse({
+      content: resultList,
+      totalItems: totalItems,
+      sort: sort ? [{ property, direction }] : []
     });
   }
 }

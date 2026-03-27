@@ -5,5 +5,6 @@ import {validateToken} from "../middlewares/Auth.js";
 const routes = express.Router();
 
 routes.post('/:userId/create', validateToken, BillController.create);
+routes.get('/:userId/list', validateToken, BillController.list)
 
 export default routes;

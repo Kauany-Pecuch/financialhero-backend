@@ -2,7 +2,7 @@ import {BelongsTo, Column, DataType, ForeignKey, Model, Table} from "sequelize-t
 import {Bill} from "./Bill.js";
 
 @Table({
-  tableName: "file",
+  tableName: "file_upload",
   freezeTableName: true,
   underscored: true
 })
@@ -38,4 +38,13 @@ export class FileUpload extends Model {
     onDelete: "CASCADE"
   })
   bill!: Bill;
+
+  toJSON() {
+    const values = { ...this.get() };
+
+    delete values.bill;
+    delete values.billId;
+
+    return values;
+  }
 }

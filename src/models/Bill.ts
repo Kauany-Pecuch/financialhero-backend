@@ -1,7 +1,7 @@
 import {BelongsTo, Column, DataType, ForeignKey, HasMany, Model, Table} from "sequelize-typescript";
-import {BillType} from "../schemas/bill/enums.js";
 import {User} from "./User.js";
 import {FileUpload} from "./FileUpload.js";
+import {BILL_TYPES, type BillType} from "../types/bill/bill-types.js";
 
 @Table({
   tableName: "bill",
@@ -11,7 +11,7 @@ import {FileUpload} from "./FileUpload.js";
 export class Bill extends Model {
 
   @Column({
-    type: DataType.STRING(...Object.values(BillType)),
+    type: DataType.ENUM(...BILL_TYPES),
     field: "type",
     allowNull: false,
   })
@@ -61,4 +61,14 @@ export class Bill extends Model {
     onDelete: "CASCADE"
   })
   fileUploads!: FileUpload[];
+
+  toJSON() {
+    const values = { ...this.get() };
+
+    delete values.user;
+    delete values.fileUploads;
+    delete values.userId;
+
+    return values;
+  }
 }

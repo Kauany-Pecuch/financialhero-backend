@@ -47,4 +47,13 @@ export class User extends Model {
     onDelete: "CASCADE"
   })
   bills!: Bill[];
+
+  toJSON() {
+    const values = { ...this.get() };
+
+    delete values.bills;
+    delete values.password;
+
+    return values;
+  }
 }
