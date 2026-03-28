@@ -19,7 +19,6 @@ export abstract class TestContainer {
     process.env.DB_PASSWORD = this.container.getPassword();
     process.env.DB_NAME = this.container.getDatabase();
 
-    // Importante: importar db só depois de setar env
     const dbModule = await import("../../src/db.js");
     this.sequelize = dbModule.default;
 
