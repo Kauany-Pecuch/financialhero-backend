@@ -1,4 +1,3 @@
-// src/tests/integration/User.integration.spec.ts
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import { TestContainer } from "../TestContainer.js";
 
