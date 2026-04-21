@@ -10,6 +10,11 @@ export const paramsSchema = z.object({
   userId: z.string().min(1)
 });
 
+export const billParamsSchema = z.object({
+  userId: z.string().min(1),
+  billId: z.string().min(1)
+});
+
 export const querySchema = z.object({
   page: z.string().default("0"),
   size: z.string().default("10"),
@@ -30,6 +35,7 @@ export const createPagedResponseSchema = <T extends z.ZodTypeAny>(schema: T) =>
   });
 
 export type Params = z.infer<typeof paramsSchema>;
+export type BillParams = z.infer<typeof billParamsSchema>;
 export type Query = z.infer<typeof querySchema>;
 
 export type PagedResponse<T> = {
