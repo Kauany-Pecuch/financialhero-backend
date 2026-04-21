@@ -70,4 +70,19 @@ export default class BillService {
       sort: sort ? [{ property, direction }] : []
     });
   }
+
+  async getBill(userId: string, billId: string): Promise<Bill> {
+    const bill = await Bill.findOne({
+      where: {
+        id: billId,
+        userId: userId
+      }
+    });
+
+    if (!bill) {
+      throw new Error('Conta não encontrada');
+    }
+
+    return bill;
+  }
 }
