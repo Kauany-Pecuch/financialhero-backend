@@ -5,6 +5,7 @@ import type {Response} from "express";
 
 const billService = new BillService();
 
+//TODO mudar esse tipo aqui pra ser usado apenas na sua propria requisicao
 type Req = TypedRequest<Params, CreateBillRequest>;
 
 const create = async (
