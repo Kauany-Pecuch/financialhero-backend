@@ -1,5 +1,5 @@
 import BillService from "../services/BillService.js";
-import {type Params, paramsSchema, querySchema, type TypedRequest} from "../types/requests.js";
+import {type Params, type BillParams, paramsSchema, billParamsSchema, querySchema, type TypedRequest} from "../types/requests.js";
 import type {CreateBillRequest} from "../types/bill/bill-types.js";
 import type {Response} from "express";
 
@@ -47,7 +47,27 @@ const list = async (
   }
 };
 
+const getBill = async (
+  req: TypedRequest<BillParams, CreateBillRequest>,
+  res: Response
+) => {
+  try {
+    const params = billParamsSchema.parse(req.params);
+    const billId = params.billId;
+
+    const bill = await billService.getBill(params.userId, billId);
+    return res.status(200).json(bill);
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Erro inesperado";
+    const statusCode = message.includes('não encontrada') ? 404 : 400;
+    return res.status(statusCode).json({
+      message: message
+    });
+  }
+};
+
 export default {
   create,
-  list
+  list,
+  getBill
 };
