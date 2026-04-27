@@ -1,15 +1,23 @@
 import BillService from "../services/BillService.js";
-import {type Params, type BillParams, paramsSchema, billParamsSchema, querySchema, type TypedRequest} from "../types/requests.js";
-import type {CreateBillRequest} from "../types/bill/bill-types.js";
-import type {Response} from "express";
+import {
+  type Params,
+  type BillParams,
+  paramsSchema,
+  billParamsSchema,
+  paginationSchema,
+  type TypedRequest
+} from "../types/requests.js";
+import {
+  type CreateBillRequest, monthlyBillParams, type MonthlyBillParams
+} from "../types/bill/bill-types.js";
+import type {
+  Response
+} from "express";
 
 const billService = new BillService();
 
-//TODO mudar esse tipo aqui pra ser usado apenas na sua propria requisicao
-type Req = TypedRequest<Params, CreateBillRequest>;
-
 const create = async (
-  req: Req,
+  req: TypedRequest<Params, CreateBillRequest>,
   res: Response
 ) => {
   try {
@@ -24,12 +32,13 @@ const create = async (
   }
 };
 
+//TODO endpoint talvez não seja necessário, verificar
 const list = async (
-  req: Req,
+  req: TypedRequest<Params>,
   res: Response
 ) => {
   try {
-    const query = querySchema.parse(req.query);
+    const query = paginationSchema.parse(req.query);
     const params = paramsSchema.parse(req.params);
 
     const body = await billService.listBill({
@@ -48,7 +57,7 @@ const list = async (
 };
 
 const getBill = async (
-  req: TypedRequest<BillParams, CreateBillRequest>,
+  req: TypedRequest<BillParams>,
   res: Response
 ) => {
   try {
@@ -66,8 +75,28 @@ const getBill = async (
   }
 };
 
+const getBillMonthly = async (
+  req: TypedRequest<MonthlyBillParams>,
+  res: Response
+) => {
+  try {
+    const userParams = paramsSchema.parse(req.params);
+    const params = monthlyBillParams.parse(req.query);
+
+    const response = await billService.findAndGroupBillMonthly(params, Number(userParams.userId));
+    return res.status(200).json(Object.fromEntries(response));
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Erro inesperado";
+    const statusCode = message.includes('não encontrada') ? 404 : 400;
+    return res.status(statusCode).json({
+      message: message
+    });
+  }
+}
+
 export default {
   create,
   list,
-  getBill
+  getBill,
+  getBillMonthly
 };

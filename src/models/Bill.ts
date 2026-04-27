@@ -44,6 +44,22 @@ export class Bill extends Model {
   })
   expirationDate!: Date;
 
+  @Column({
+    type: DataType.BOOLEAN,
+    field: "recurring",
+    defaultValue: false,
+    allowNull: false,
+  })
+  isRecurring!: boolean;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    field: "active",
+    defaultValue: true,
+    allowNull: false,
+  })
+  active!: boolean;
+
   @ForeignKey(() => User)
   @Column({
     type: DataType.INTEGER,
