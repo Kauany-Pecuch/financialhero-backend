@@ -17,3 +17,7 @@ export const getFileHash = async (
 
   return createHash("sha256").update(fileContent).digest("hex");
 };
+
+export function isEmpty<T>(arr: T[]): boolean {
+  return !arr || arr.length === 0;
+}

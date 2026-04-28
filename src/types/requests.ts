@@ -10,12 +10,13 @@ export const paramsSchema = z.object({
   userId: z.string().min(1)
 });
 
+//TODO mover pra um bill-types.ts
 export const billParamsSchema = z.object({
   userId: z.string().min(1),
   billId: z.string().min(1)
 });
 
-export const querySchema = z.object({
+export const paginationSchema = z.object({
   page: z.string().default("0"),
   size: z.string().default("10"),
   sort: z.string().nullish()
@@ -35,8 +36,8 @@ export const createPagedResponseSchema = <T extends z.ZodTypeAny>(schema: T) =>
   });
 
 export type Params = z.infer<typeof paramsSchema>;
-export type BillParams = z.infer<typeof billParamsSchema>;
-export type Query = z.infer<typeof querySchema>;
+export type BillParams = z.infer<typeof billParamsSchema>; //TODO mover pra bill-types.ts
+export type PagedRequest = z.infer<typeof paginationSchema>;
 
 export type PagedResponse<T> = {
   content: T[];

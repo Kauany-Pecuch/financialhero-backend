@@ -1,9 +1,17 @@
 import {Bill} from "../models/Bill.js";
 import {User} from "../models/User.js";
-import type {CreateBillRequest} from "../types/bill/bill-types.js";
+import {
+  type CreateBillRequest,
+  type MonthlyBillParams,
+  type Month,
+  MONTH,
+  type MonthBills
+} from "../types/bill/bill-types.js";
 import type {PagedResponse} from "../types/requests.js";
 import BillRepository from "../repository/BillRepository.js";
 import {createPagedResponse} from "../shared/builders.js";
+import {isEmpty} from "../shared/utils.js";
+import {logger} from "../shared/logger.js";
 
 const billRepository = new BillRepository();
 
@@ -23,7 +31,7 @@ export default class BillService {
       throw new Error('Usuário não encontrado');
     }
 
-    const { billType, expirationDate, name, amount, description } = creationRequest;
+    const { billType, expirationDate, name, amount, description, isRecurring } = creationRequest;
 
     return await Bill.create({
       type: billType,
@@ -31,6 +39,7 @@ export default class BillService {
       amount: amount,
       name: name,
       expirationDate: expirationDate,
+      isRecurring: isRecurring,
       userId: user.id
     });
   }
@@ -84,5 +93,29 @@ export default class BillService {
     }
 
     return bill;
+  }
+
+  async findAndGroupBillMonthly(
+    q: MonthlyBillParams,
+    userId: number
+  ): Promise<Map<Month, MonthBills[]>> {
+    const billMonthList = await billRepository.findAllBillByMonths({
+      userId: userId,
+      months: q.months,
+      year: q.year
+    });
+
+    if (isEmpty(billMonthList)) {
+      logger.info('Sem registros para exibir nos meses passados');
+    }
+
+    const grouped = billMonthList.reduce((acc, bill) => {
+      const list = acc.get(bill.month) ?? [];
+      list.push(bill);
+      acc.set(bill.month, list);
+      return acc;
+    }, new Map<Month, MonthBills[]>());
+
+    return grouped;
   }
 }
