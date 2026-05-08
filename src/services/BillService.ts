@@ -12,6 +12,7 @@ import BillRepository from "../repository/BillRepository.js";
 import {createPagedResponse} from "../shared/builders.js";
 import {isEmpty} from "../shared/utils.js";
 import {logger} from "../shared/logger.js";
+import { AppError } from "../errors/AppError.js";
 
 const billRepository = new BillRepository();
 
@@ -117,5 +118,15 @@ export default class BillService {
     }, new Map<Month, MonthBills[]>());
 
     return grouped;
+  }
+
+  async payBill(billId: number, userId: number, isPaid: boolean): Promise<{ message: string }> {
+    const bill = await Bill.findOne({ where: { id: billId, userId } });
+    if (!bill) {
+      throw new AppError("Conta não encontrada", 404);
+    }
+    
+    await bill.update({ isPaid });
+    return { message: `Conta ${isPaid ? 'marcada como paga' : 'desmarcada como paga'} com sucesso` };
   }
 }
