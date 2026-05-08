@@ -100,8 +100,7 @@ const pay = async (
 ) => {
   try {
     const params = billParamsSchema.parse(req.params);
-    const { isPaid } = req.body;
-
+    const { isPaid } = req.body as { isPaid: boolean };
     const result = await billService.payBill(Number(params.billId), Number(params.userId), isPaid);
     res.status(200).json(result);
   } catch (e: unknown) {
