@@ -1,5 +1,6 @@
 import {BelongsTo, Column, DataType, ForeignKey, Model, Table} from "sequelize-typescript";
 import {Bill} from "./Bill.js";
+import {TIPO_ARQUIVO, type TipoArquivo} from "../types/file-upload/file-upload-types.js";
 
 @Table({
   tableName: "file_upload",
@@ -20,6 +21,12 @@ export class FileUpload extends Model {
     field: "hash"
   })
   hash!: string;
+
+  @Column({
+    type: DataType.ENUM(...TIPO_ARQUIVO),
+    field: "type"
+  })
+  type!: TipoArquivo;
 
   @Column({
     type: DataType.STRING,
