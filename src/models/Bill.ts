@@ -54,6 +54,14 @@ export class Bill extends Model {
 
   @Column({
     type: DataType.BOOLEAN,
+    field: "is_paid",
+    defaultValue: false,
+    allowNull: false,
+  })
+  isPaid!: boolean;
+
+  @Column({
+    type: DataType.BOOLEAN,
     field: "active",
     defaultValue: true,
     allowNull: false,

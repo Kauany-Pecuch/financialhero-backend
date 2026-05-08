@@ -94,9 +94,29 @@ const getBillMonthly = async (
   }
 }
 
+const pay = async (
+  req: TypedRequest<BillParams>,
+  res: Response
+) => {
+  try {
+    const params = billParamsSchema.parse(req.params);
+    const { isPaid } = req.body;
+
+    const result = await billService.payBill(Number(params.billId), Number(params.userId), isPaid);
+    res.status(200).json(result);
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Erro inesperado";
+    const statusCode = message.includes('não encontrada') ? 404 : 400;
+    return res.status(statusCode).json({
+      message: message
+    });
+  }
+}
+
 export default {
   create,
   list,
   getBill,
-  getBillMonthly
+  getBillMonthly,
+  pay
 };

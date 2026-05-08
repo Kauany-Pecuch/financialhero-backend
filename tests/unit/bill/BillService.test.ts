@@ -95,3 +95,48 @@ describe("BillService - getBill", () => {
     expect(result.userId).toBe("789");
   });
 });
+
+describe("BillService - payBill", () => {
+  let billService: BillService;
+
+  const makeBill = (override = {}) => ({
+    id: 1,
+    name: "Conta",
+    amount: 100,
+    type: "GENERIC",
+    description: "Descrição",
+    expirationDate: new Date(),
+    userId: 123,
+    update: vi.fn(),
+    ...override
+  });
+
+  beforeEach(() => {
+    billService = new BillService();
+    vi.clearAllMocks();
+  });
+
+  it("deve marcar a conta como paga com sucesso", async () => {
+    const mockBill = makeBill();
+    vi.mocked(Bill.findOne).mockResolvedValue(mockBill as any);
+
+    const result = await billService.payBill(1, 123, true);
+    expect(result.message).toBe("Conta marcada como paga com sucesso");
+    expect(mockBill.update).toHaveBeenCalledWith({ isPaid: true });
+  });
+
+  it("deve desmarcar a conta como paga com sucesso", async () => {
+    const mockBill = makeBill();
+    vi.mocked(Bill.findOne).mockResolvedValue(mockBill as any);
+
+    const result = await billService.payBill(1, 123, false);
+    expect(result.message).toBe("Conta desmarcada como paga com sucesso");
+    expect(mockBill.update).toHaveBeenCalledWith({ isPaid: false });
+  });
+
+  it("deve lançar erro se a conta não for encontrada", async () => {
+    vi.mocked(Bill.findOne).mockResolvedValue(null);
+
+    await expect(billService.payBill(1, 123, true)).rejects.toThrow("Conta não encontrada");
+  });
+});
