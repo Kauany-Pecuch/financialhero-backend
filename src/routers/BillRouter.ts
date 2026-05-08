@@ -8,5 +8,6 @@ routes.post('/:userId/create', validateToken, BillController.create);
 routes.get('/:userId/list', validateToken, BillController.list);
 routes.get('/:userId/bill/:billId', validateToken, BillController.getBill);
 routes.get('/:userId/monthly', validateToken, BillController.getBillMonthly);
+routes.put('/:userId/bill/:billId/pay', validateToken, BillController.pay);
 
 export default routes;
