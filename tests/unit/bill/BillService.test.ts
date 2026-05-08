@@ -107,7 +107,7 @@ describe("BillService - payBill", () => {
     description: "Descrição",
     expirationDate: new Date(),
     userId: 123,
-    update: vi.fn(),
+    update: vi.fn().mockResolvedValue(true), // Garante retorno de Promise para o await interno
     ...override
   });
 
@@ -121,6 +121,7 @@ describe("BillService - payBill", () => {
     vi.mocked(Bill.findOne).mockResolvedValue(mockBill as any);
 
     const result = await billService.payBill(1, 123, true);
+    
     expect(result.message).toBe("Conta marcada como paga com sucesso");
     expect(mockBill.update).toHaveBeenCalledWith({ isPaid: true });
   });
@@ -130,6 +131,7 @@ describe("BillService - payBill", () => {
     vi.mocked(Bill.findOne).mockResolvedValue(mockBill as any);
 
     const result = await billService.payBill(1, 123, false);
+    
     expect(result.message).toBe("Conta desmarcada como paga com sucesso");
     expect(mockBill.update).toHaveBeenCalledWith({ isPaid: false });
   });
