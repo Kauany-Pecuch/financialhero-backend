@@ -10,7 +10,8 @@ vi.mock("../../../src/db.ts", () => ({
 
 vi.mock("../../../src/models/User.js", () => ({
   User: {
-    findOne: vi.fn()
+    findOne: vi.fn(),
+    findByPk: vi.fn()
   }
 }));
 
@@ -28,7 +29,7 @@ vi.mock("../../../src/shared/providers/MailProvider.js", () => ({
 }));
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { PasswordService } from "../../../src/services/PasswordService.js";
+import { PasswordService, tokenStore } from "../../../src/services/PasswordService.js";
 import { User } from "../../../src/models/User.js";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -40,13 +41,13 @@ describe("PasswordService - sendForgotPasswordEmail", () => {
     id: 1,
     email: "joao@example.com",
     password: "hashed_password",
-    update: vi.fn().mockResolvedValue(undefined),
     ...override
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockSendMail.mockResolvedValue(undefined);
+    tokenStore.clear();
     passwordService = new PasswordService();
   });
 
@@ -72,18 +73,16 @@ describe("PasswordService - sendForgotPasswordEmail", () => {
       });
     });
 
-    it("deve salvar token e expiração no usuário", async () => {
+    it("deve salvar o hash do token no cache com userId e expiração", async () => {
       const mockUser = makeUser();
       vi.mocked(User.findOne).mockResolvedValue(mockUser as any);
 
       await passwordService.sendForgotPasswordEmail("joao@example.com");
 
-      expect(mockUser.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          passwordResetToken: expect.any(String),
-          passwordResetExpires: expect.any(Date)
-        })
-      );
+      expect(tokenStore.size).toBe(1);
+      const [, entry] = [...tokenStore.entries()][0]!;
+      expect(entry.userId).toBe(1);
+      expect(entry.expiresAt).toBeInstanceOf(Date);
     });
 
     it("deve definir expiração de aproximadamente 1 hora", async () => {
@@ -93,8 +92,8 @@ describe("PasswordService - sendForgotPasswordEmail", () => {
       const agora = Date.now();
       await passwordService.sendForgotPasswordEmail("joao@example.com");
 
-      const { passwordResetExpires } = mockUser.update.mock.calls[0]![0];
-      const diff = passwordResetExpires.getTime() - agora;
+      const [, entry] = [...tokenStore.entries()][0]!;
+      const diff = entry.expiresAt.getTime() - agora;
 
       expect(diff).toBeGreaterThanOrEqual(59 * 60 * 1000);
       expect(diff).toBeLessThanOrEqual(61 * 60 * 1000);
@@ -113,19 +112,18 @@ describe("PasswordService - sendForgotPasswordEmail", () => {
       );
     });
 
-    it("deve salvar o hash do token e não o token bruto", async () => {
+    it("deve salvar o hash do token e não o token bruto no cache", async () => {
       const mockUser = makeUser();
       vi.mocked(User.findOne).mockResolvedValue(mockUser as any);
 
       await passwordService.sendForgotPasswordEmail("joao@example.com");
 
-      const { passwordResetToken: savedHash } = mockUser.update.mock.calls[0]![0];
       const emailHtml: string = mockSendMail.mock.calls[0]![2];
       const tokenInLink = emailHtml.match(/token=([a-f0-9]+)/)?.[1]!;
+      const expectedHash = crypto.createHash('sha256').update(tokenInLink).digest('hex');
 
-      expect(savedHash).not.toBe(tokenInLink);
-      expect(savedHash).toHaveLength(64);
-      expect(crypto.createHash('sha256').update(tokenInLink).digest('hex')).toBe(savedHash);
+      expect(tokenStore.has(expectedHash)).toBe(true);
+      expect(tokenStore.has(tokenInLink)).toBe(false);
     });
   });
 });
@@ -137,32 +135,30 @@ describe("PasswordService - resetPassword", () => {
     id: 1,
     email: "joao@example.com",
     password: "hashed_password",
-    passwordResetToken: "valid_token",
-    passwordResetExpires: new Date(Date.now() + 60 * 60 * 1000),
     update: vi.fn().mockResolvedValue(undefined),
     ...override
   });
 
+  const seedToken = (userId: number, expiresAt: Date) => {
+    const tokenHash = crypto.createHash('sha256').update("valid_token").digest('hex');
+    tokenStore.set(tokenHash, { userId, expiresAt });
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSendMail.mockResolvedValue(undefined);
+    tokenStore.clear();
     passwordService = new PasswordService();
   });
 
   describe("Validações", () => {
-    it("deve lançar erro se token inválido", async () => {
-      vi.mocked(User.findOne).mockResolvedValue(null);
-
+    it("deve lançar erro se token não existe no cache", async () => {
       await expect(
         passwordService.resetPassword("token_invalido", "novaSenha123")
       ).rejects.toThrow("Token inválido ou expirado");
     });
 
     it("deve lançar erro se token expirado", async () => {
-      const mockUser = makeUser({
-        passwordResetExpires: new Date(Date.now() - 1000)
-      });
-      vi.mocked(User.findOne).mockResolvedValue(mockUser as any);
+      seedToken(1, new Date(Date.now() - 1000));
 
       await expect(
         passwordService.resetPassword("valid_token", "novaSenha123")
@@ -171,7 +167,8 @@ describe("PasswordService - resetPassword", () => {
 
     it("deve lançar erro se nova senha igual à anterior", async () => {
       const mockUser = makeUser();
-      vi.mocked(User.findOne).mockResolvedValue(mockUser as any);
+      seedToken(1, new Date(Date.now() + 60 * 60 * 1000));
+      vi.mocked(User.findByPk).mockResolvedValue(mockUser as any);
       vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
 
       await expect(
@@ -181,23 +178,22 @@ describe("PasswordService - resetPassword", () => {
   });
 
   describe("Fluxo", () => {
-    it("deve chamar findOne com o hash do token, não o token bruto", async () => {
+    it("deve buscar o usuário pelo userId do cache", async () => {
       const mockUser = makeUser();
-      vi.mocked(User.findOne).mockResolvedValue(mockUser as any);
+      seedToken(1, new Date(Date.now() + 60 * 60 * 1000));
+      vi.mocked(User.findByPk).mockResolvedValue(mockUser as any);
       vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
       vi.mocked(bcrypt.hash).mockResolvedValue("nova_senha_hashed" as never);
 
       await passwordService.resetPassword("valid_token", "novaSenha123");
 
-      const expectedHash = crypto.createHash('sha256').update("valid_token").digest('hex');
-      expect(User.findOne).toHaveBeenCalledWith({
-        where: { passwordResetToken: expectedHash }
-      });
+      expect(User.findByPk).toHaveBeenCalledWith(1);
     });
 
     it("deve verificar se a nova senha é igual à anterior", async () => {
       const mockUser = makeUser();
-      vi.mocked(User.findOne).mockResolvedValue(mockUser as any);
+      seedToken(1, new Date(Date.now() + 60 * 60 * 1000));
+      vi.mocked(User.findByPk).mockResolvedValue(mockUser as any);
       vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
       vi.mocked(bcrypt.hash).mockResolvedValue("nova_senha_hashed" as never);
 
@@ -208,30 +204,26 @@ describe("PasswordService - resetPassword", () => {
 
     it("deve atualizar a senha com o hash da nova senha", async () => {
       const mockUser = makeUser();
-      vi.mocked(User.findOne).mockResolvedValue(mockUser as any);
+      seedToken(1, new Date(Date.now() + 60 * 60 * 1000));
+      vi.mocked(User.findByPk).mockResolvedValue(mockUser as any);
       vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
       vi.mocked(bcrypt.hash).mockResolvedValue("nova_senha_hashed" as never);
 
       await passwordService.resetPassword("valid_token", "novaSenha123");
 
-      expect(mockUser.update).toHaveBeenCalledWith(
-        expect.objectContaining({ password: "nova_senha_hashed" })
-      );
+      expect(mockUser.update).toHaveBeenCalledWith({ password: "nova_senha_hashed" });
     });
 
-    it("deve limpar token e expiração após reset bem-sucedido", async () => {
+    it("deve remover o token do cache após reset bem-sucedido", async () => {
       const mockUser = makeUser();
-      vi.mocked(User.findOne).mockResolvedValue(mockUser as any);
+      seedToken(1, new Date(Date.now() + 60 * 60 * 1000));
+      vi.mocked(User.findByPk).mockResolvedValue(mockUser as any);
       vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
       vi.mocked(bcrypt.hash).mockResolvedValue("nova_senha_hashed" as never);
 
       await passwordService.resetPassword("valid_token", "novaSenha123");
 
-      expect(mockUser.update).toHaveBeenCalledWith({
-        password: "nova_senha_hashed",
-        passwordResetToken: null,
-        passwordResetExpires: null
-      });
+      expect(tokenStore.size).toBe(0);
     });
   });
 });
