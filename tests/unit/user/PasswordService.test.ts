@@ -109,7 +109,7 @@ describe("PasswordService - sendForgotPasswordEmail", () => {
       expect(mockSendMail).toHaveBeenCalledWith(
         "joao@example.com",
         "Recuperação de Senha - Financial Hero",
-        expect.stringContaining("http://localhost:3000/reset-password")
+        expect.stringContaining("reset-password?token=")
       );
     });
 
