@@ -42,6 +42,20 @@ export class User extends Model {
   })
   password!: string;
 
+  @Column({
+    type: DataType.STRING,
+    field: "password_reset_token",
+    allowNull: true,
+  })
+  passwordResetToken?: string | null;
+
+  @Column({
+    type: DataType.DATE,
+    field: "password_reset_expires",
+    allowNull: true,
+  })
+  passwordResetExpires?: Date | null;
+
   @HasMany(() => Bill, {
     foreignKey: "user_id",
     onDelete: "CASCADE"
@@ -53,6 +67,8 @@ export class User extends Model {
 
     delete values.bills;
     delete values.password;
+    delete values.passwordResetToken;
+    delete values.passwordResetExpires;
 
     return values;
   }
