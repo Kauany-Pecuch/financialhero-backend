@@ -1,8 +1,13 @@
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
+import dotenv from 'dotenv';
 import { User } from '../models/User.js';
 import { MailProvider } from '../shared/providers/MailProvider.js';
 import { AppError } from '../errors/AppError.js';
+
+dotenv.config();
+
+const { FRONTEND_URL } = process.env;
 
 export class PasswordService {
   private mailProvider = new MailProvider();
@@ -12,15 +17,16 @@ export class PasswordService {
     if (!user) throw new AppError("Usuário não encontrado", 404);
 
     const token = crypto.randomBytes(20).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expires = new Date();
     expires.setHours(expires.getHours() + 1);
 
     await user.update({
-      passwordResetToken: token,
+      passwordResetToken: tokenHash,
       passwordResetExpires: expires,
     });
 
-    const link = `http://localhost:3000/reset-password?token=${token}`;
+    const link = `${FRONTEND_URL}/reset-password?token=${token}`;
     await this.mailProvider.sendMail(
       email,
       "Recuperação de Senha - Financial Hero",
@@ -29,7 +35,8 @@ export class PasswordService {
   }
 
   async resetPassword(token: string, password: string): Promise<void> {
-    const user = await User.findOne({ where: { passwordResetToken: token } });
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await User.findOne({ where: { passwordResetToken: tokenHash } });
 
     if (!user || (user.passwordResetExpires && new Date() > user.passwordResetExpires)) {
       throw new AppError("Token inválido ou expirado", 400);

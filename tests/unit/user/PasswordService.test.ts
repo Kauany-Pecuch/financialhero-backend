@@ -31,6 +31,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { PasswordService } from "../../../src/services/PasswordService.js";
 import { User } from "../../../src/models/User.js";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 
 describe("PasswordService - sendForgotPasswordEmail", () => {
   let passwordService: PasswordService;
@@ -112,16 +113,19 @@ describe("PasswordService - sendForgotPasswordEmail", () => {
       );
     });
 
-    it("deve incluir o token no link enviado por e-mail", async () => {
+    it("deve salvar o hash do token e não o token bruto", async () => {
       const mockUser = makeUser();
       vi.mocked(User.findOne).mockResolvedValue(mockUser as any);
 
       await passwordService.sendForgotPasswordEmail("joao@example.com");
 
-      const { passwordResetToken } = mockUser.update.mock.calls[0]![0];
+      const { passwordResetToken: savedHash } = mockUser.update.mock.calls[0]![0];
       const emailHtml: string = mockSendMail.mock.calls[0]![2];
+      const tokenInLink = emailHtml.match(/token=([a-f0-9]+)/)?.[1]!;
 
-      expect(emailHtml).toContain(passwordResetToken);
+      expect(savedHash).not.toBe(tokenInLink);
+      expect(savedHash).toHaveLength(64);
+      expect(crypto.createHash('sha256').update(tokenInLink).digest('hex')).toBe(savedHash);
     });
   });
 });
@@ -177,7 +181,7 @@ describe("PasswordService - resetPassword", () => {
   });
 
   describe("Fluxo", () => {
-    it("deve chamar findOne com o token correto", async () => {
+    it("deve chamar findOne com o hash do token, não o token bruto", async () => {
       const mockUser = makeUser();
       vi.mocked(User.findOne).mockResolvedValue(mockUser as any);
       vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
@@ -185,8 +189,9 @@ describe("PasswordService - resetPassword", () => {
 
       await passwordService.resetPassword("valid_token", "novaSenha123");
 
+      const expectedHash = crypto.createHash('sha256').update("valid_token").digest('hex');
       expect(User.findOne).toHaveBeenCalledWith({
-        where: { passwordResetToken: "valid_token" }
+        where: { passwordResetToken: expectedHash }
       });
     });
 
