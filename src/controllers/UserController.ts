@@ -1,8 +1,10 @@
 import type { RequestHandler } from "express";
 import UserService from "../services/UserService.js";
+import { PasswordService } from "../services/PasswordService.js";
 import { AppError } from "../errors/AppError.js";
 
 const userService = new UserService();
+const passwordService = new PasswordService();
 
 const create: RequestHandler = async (
   _req,
@@ -67,8 +69,38 @@ const update: RequestHandler = async (
   }
 };
 
+const forgotPassword: RequestHandler = async (_req, res) => {
+  try {
+    const { email } = _req.body as { email: string };
+    await passwordService.sendForgotPasswordEmail(email);
+    return res.status(200).json({ message: "E-mail de recuperação enviado com sucesso" });
+  } catch (e: unknown) {
+    if (e instanceof AppError) {
+      return res.status(e.statusCode).json({ message: e.message });
+    }
+    const message = e instanceof Error ? e.message : "Erro inesperado";
+    return res.status(400).json({ message });
+  }
+};
+
+const resetPassword: RequestHandler = async (_req, res) => {
+  try {
+    const { token, password } = _req.body as { token: string; password: string };
+    await passwordService.resetPassword(token, password);
+    return res.json({ message: "Senha alterada com sucesso" });
+  } catch (e: unknown) {
+    if (e instanceof AppError) {
+      return res.status(e.statusCode).json({ message: e.message });
+    }
+    const message = e instanceof Error ? e.message : "Erro inesperado";
+    return res.status(400).json({ message });
+  }
+};
+
 export default {
   create,
   login,
-    update,
+  update,
+  forgotPassword,
+  resetPassword,
 };
