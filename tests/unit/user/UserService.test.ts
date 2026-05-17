@@ -12,14 +12,13 @@ vi.mock("../../../src/models/User.js", () => ({
 }));
 
 import { describe, it, expect, beforeEach } from "vitest";
-import UserService from "../../../src/services/UserService.js";
 import { User } from "../../../src/models/User.js";
 
-// Ensure JWT secret is available for token generation during tests.
-process.env.JWT_SECRET = "test-secret";
+type UserServiceClassType = typeof import("../../../src/services/UserService.js").default;
 
 describe("UserService - updateUser", () => {
-  let userService: UserService;
+  let userService: InstanceType<UserServiceClassType>;
+  let UserServiceClass: UserServiceClassType;
 
   const makeUser = (override = {}) => ({
     id: 1,
@@ -32,8 +31,12 @@ describe("UserService - updateUser", () => {
     ...override
   });
 
-  beforeEach(() => {
-    userService = new UserService();
+  beforeEach(async () => {
+    vi.stubEnv("JWT_SECRET", "test-secret");
+    vi.resetModules();
+    const module = await import("../../../src/services/UserService.js");
+    UserServiceClass = module.default;
+    userService = new UserServiceClass();
     vi.clearAllMocks();
   });
 
