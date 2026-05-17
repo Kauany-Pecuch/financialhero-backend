@@ -15,6 +15,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import UserService from "../../../src/services/UserService.js";
 import { User } from "../../../src/models/User.js";
 
+// Ensure JWT secret is available for token generation during tests.
+process.env.JWT_SECRET = "test-secret";
+
 describe("UserService - updateUser", () => {
   let userService: UserService;
 
