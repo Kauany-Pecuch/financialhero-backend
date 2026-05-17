@@ -5,6 +5,9 @@ import {getFileHash} from "../shared/utils.js";
 import type {TipoArquivo} from "../types/file-upload/file-upload-types.js";
 import fs from "node:fs";
 import path from "node:path";
+import FileUploadRepository from "../repository/FileUploadRepository.js";
+
+const fileUploadRepository = new FileUploadRepository();
 
 export default class FileUploadService {
 
@@ -54,5 +57,28 @@ export default class FileUploadService {
       path: normalizedPath,
       name: fileUpload.name,
     };
+  }
+
+  async listFiles(
+    {
+      search,
+      billId,
+      type
+    }:{
+      search?: string | null;
+      billId?: number | null;
+      type: TipoArquivo;
+    }
+  ): Promise<FileUpload[]> {
+    const params: { search?: string | null; billId?: number | null; type: TipoArquivo } = {
+      type,
+      search: search ?? null
+    };
+
+    if (billId !== undefined) {
+      params.billId = billId;
+    }
+
+    return await fileUploadRepository.findAllFiles(params);
   }
 }

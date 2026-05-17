@@ -5,6 +5,7 @@ import uploadPdf from "../middlewares/UploadPdf.js";
 
 const routes = express.Router();
 
+routes.get("/", validateToken, FileUploadController.list);
 routes.post("/:billId/upload", validateToken, uploadPdf.single("file"), FileUploadController.upload);
 routes.get("/:fileId", validateToken, FileUploadController.download)
 

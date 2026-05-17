@@ -23,8 +23,9 @@ const uploadPdf = multer({
     fileSize: 5 * 1024 * 1024,
   },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype !== "application/pdf") {
-      cb(new AppError("Apenas arquivos PDF sao permitidos", 400, "INVALID_FILE_TYPE"));
+    const allowedTypes = ["application/pdf", "image/png", "image/jpeg"];
+    if (!allowedTypes.includes(file.mimetype)) {
+      cb(new AppError("Apenas arquivos PDF, PNG ou JPG sao permitidos", 400, "INVALID_FILE_TYPE"));
       return;
     }
 
@@ -33,4 +34,3 @@ const uploadPdf = multer({
 });
 
 export default uploadPdf;
-

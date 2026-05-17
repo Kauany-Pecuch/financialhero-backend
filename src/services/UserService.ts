@@ -68,7 +68,7 @@ export default class UserService {
   async updateUser(
     userId: number,
     updateRequest: UpdateUserRequest
-  ): Promise<User> {
+  ): Promise<{user: User, token: string}> {
     const { firstName, lastName, email, wage } = updateRequest;
 
     const user = await User.findByPk(userId);
@@ -108,7 +108,9 @@ export default class UserService {
 
     await user.update(dataToUpdate);
 
-    return user;
+    const token = this.createToken(user);
+
+    return {user, token};
   }
 
   private createToken(user: User): string {
