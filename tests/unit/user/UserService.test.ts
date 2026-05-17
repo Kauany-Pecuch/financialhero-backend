@@ -12,11 +12,13 @@ vi.mock("../../../src/models/User.js", () => ({
 }));
 
 import { describe, it, expect, beforeEach } from "vitest";
-import UserService from "../../../src/services/UserService.js";
 import { User } from "../../../src/models/User.js";
 
+type UserServiceClassType = typeof import("../../../src/services/UserService.js").default;
+
 describe("UserService - updateUser", () => {
-  let userService: UserService;
+  let userService: InstanceType<UserServiceClassType>;
+  let UserServiceClass: UserServiceClassType;
 
   const makeUser = (override = {}) => ({
     id: 1,
@@ -29,8 +31,12 @@ describe("UserService - updateUser", () => {
     ...override
   });
 
-  beforeEach(() => {
-    userService = new UserService();
+  beforeEach(async () => {
+    vi.stubEnv("JWT_SECRET", "test-secret");
+    vi.resetModules();
+    const module = await import("../../../src/services/UserService.js");
+    UserServiceClass = module.default;
+    userService = new UserServiceClass();
     vi.clearAllMocks();
   });
 
@@ -197,7 +203,8 @@ describe("UserService - updateUser", () => {
         firstName: "Jane"
       });
 
-      expect(result).toBe(mockUser);
+      expect(result.user).toBe(mockUser);
+      expect(result.token).toEqual(expect.any(String));
     });
   });
 });

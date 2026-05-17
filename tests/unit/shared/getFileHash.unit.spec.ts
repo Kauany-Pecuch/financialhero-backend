@@ -48,13 +48,12 @@ describe("getFileHash", () => {
       path: "",
     } as Express.Multer.File;
 
-    expect(getFileHash(file)).rejects.toBeInstanceOf(AppError);
-    expect(getFileHash(file)).rejects.toMatchObject({
+    await expect(getFileHash(file)).rejects.toBeInstanceOf(AppError);
+    await expect(getFileHash(file)).rejects.toMatchObject({
       message: "Nao foi possivel ler o arquivo enviado",
       statusCode: 400,
       code: "INVALID_FILE_PAYLOAD",
     });
   });
 });
-
 

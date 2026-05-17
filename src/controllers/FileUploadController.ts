@@ -3,7 +3,7 @@ import { z } from "zod";
 import { AppError } from "../errors/AppError.js";
 import { logger } from "../shared/logger.js";
 import FileUploadService from "../services/FileUploadService.js";
-import {uploadFileSchema} from "../types/file-upload/file-upload-types.js";
+import {fileUploadQuerySchema, uploadFileSchema} from "../types/file-upload/file-upload-types.js";
 import type {TypedRequest} from "../types/requests.js";
 
 const fileUploadService = new FileUploadService();
@@ -19,7 +19,7 @@ const fileIdSchema = z.object({
 const upload = async (req: Request, res: Response) => {
   try {
 		const { billId } = billIdSchema.parse(req.params);
-		const params = uploadFileSchema.parse(req.params);
+		const params = uploadFileSchema.parse(req.query);
 
 		if (!req.file) {
 			throw new AppError("Arquivo nao enviado", 400, "FILE_REQUIRED");
@@ -74,7 +74,41 @@ const download = async (req: TypedRequest, res: Response) => {
 	}
 };
 
+const list = async (req: TypedRequest, res: Response) => {
+	try {
+		const { search, billId, type } = fileUploadQuerySchema.parse(req.query);
+		const listParams: { type: typeof type; billId?: number | null; search?: string | null } = { type };
+		if (billId !== undefined) {
+			listParams.billId = billId;
+		}
+		if (search !== undefined) {
+			listParams.search = search;
+		}
+		const files = await fileUploadService.listFiles(listParams);
+
+		return res.status(200).json(files);
+	} catch (e: unknown) {
+		if (!(e instanceof AppError) && !(e instanceof z.ZodError)) {
+			logger.error({ err: e, path: req.originalUrl, method: req.method }, "Falha ao listar arquivos");
+		}
+
+		const error =
+			e instanceof AppError
+				? e
+				: e instanceof z.ZodError
+					? new AppError("Parametros invalidos", 400, "INVALID_QUERY")
+					: new AppError("Erro ao listar arquivos", 500, "LIST_FILES_ERROR");
+
+		return res.status(error.statusCode).json({
+			message: error.message,
+			code: error.code,
+			details: error.details,
+		});
+	}
+};
+
 export default {
   upload,
-	download
+	download,
+	list
 };
