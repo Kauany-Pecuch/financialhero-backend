@@ -197,7 +197,8 @@ describe("UserService - updateUser", () => {
         firstName: "Jane"
       });
 
-      expect(result).toBe(mockUser);
+      expect(result.user).toBe(mockUser);
+      expect(result.token).toEqual(expect.any(String));
     });
   });
 });
