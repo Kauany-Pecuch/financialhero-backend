@@ -180,4 +180,98 @@ export default class BillRepository {
         type: QueryTypes.SELECT
       });
   }
+  async findUpcomingBills({
+    userId,
+    days = 15
+  }: {
+    userId: number | string,
+    days?: number
+  }): Promise<Bill[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + days);
+
+    const bills = await sequelize.query<Bill>(`
+        SELECT b.*
+        FROM bill b
+        WHERE b.user_id = :userId
+          AND b.is_paid = false
+          AND b.active = true
+          AND b.expiration_date >= :today
+          AND b.expiration_date <= :endDate
+        ORDER BY b.expiration_date ASC
+      `,
+      {
+        replacements: {
+          userId: userId,
+          today: today,
+          endDate: endDate
+        },
+        type: QueryTypes.SELECT
+      }
+    );
+
+    return bills;
+  }
+
+  async getTrendData({
+    userId,
+    months
+  }: {
+    userId: number | string,
+    months: number
+  }): Promise<Array<{
+    month: number,
+    year: number,
+    total: number,
+    recurring: number,
+    oneOff: number
+  }>> {
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setMonth(startDate.getMonth() - (months - 1));
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(today);
+    endDate.setHours(23, 59, 59, 999);
+
+    const results = await sequelize.query<{
+      month: number,
+      year: number,
+      total: string,
+      recurring: string,
+      oneOff: string
+    }>(`
+      SELECT
+        EXTRACT(MONTH FROM b.expiration_date)::int AS month,
+        EXTRACT(YEAR FROM b.expiration_date)::int AS year,
+        COALESCE(SUM(b.amount), 0) AS total,
+        COALESCE(SUM(CASE WHEN b.recurring = true THEN b.amount ELSE 0 END), 0) AS recurring,
+        COALESCE(SUM(CASE WHEN b.recurring = false THEN b.amount ELSE 0 END), 0) AS "oneOff"
+      FROM bill b
+      WHERE b.user_id = :userId
+        AND b.expiration_date >= :startDate
+        AND b.expiration_date <= :endDate
+      GROUP BY EXTRACT(YEAR FROM b.expiration_date), EXTRACT(MONTH FROM b.expiration_date)
+      ORDER BY year ASC, month ASC
+    `, {
+      replacements: {
+        userId: userId,
+        startDate: startDate,
+        endDate: endDate
+      },
+      type: QueryTypes.SELECT
+    });
+
+    return results.map(r => ({
+      month: r.month,
+      year: r.year,
+      total: Number(r.total),
+      recurring: Number(r.recurring),
+      oneOff: Number(r.oneOff)
+    }));
+  }
 }
