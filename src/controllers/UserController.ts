@@ -97,10 +97,29 @@ const resetPassword: RequestHandler = async (_req, res) => {
   }
 };
 
+const changePassword: RequestHandler = async (_req, res) => {
+  try {
+    const { userId } = _req.params;
+    const { currentPassword, newPassword } = _req.body as {
+      currentPassword: string;
+      newPassword: string;
+    };
+    await passwordService.changePassword(Number(userId), currentPassword, newPassword);
+    return res.status(200).json({ message: "Senha alterada com sucesso" });
+  } catch (e: unknown) {
+    if (e instanceof AppError) {
+      return res.status(e.statusCode).json({ message: e.message });
+    }
+    const message = e instanceof Error ? e.message : "Erro inesperado";
+    return res.status(400).json({ message });
+  }
+};
+
 export default {
   create,
   login,
   update,
   forgotPassword,
   resetPassword,
+  changePassword
 };
