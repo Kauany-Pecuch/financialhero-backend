@@ -129,4 +129,82 @@ export default class BillService {
     await bill.update({ isPaid });
     return { message: `Conta ${isPaid ? 'marcada como paga' : 'desmarcada como paga'} com sucesso` };
   }
+  async getUpcomingBills({
+    userId,
+    days = 15
+  }: {
+    userId: number | string,
+    days?: number
+  }): Promise<{
+    bills: Array<{
+      id: number;
+      name: string;
+      amount: number;
+      expirationDate: string;
+      daysUntilDue: number;
+      isRecurring: boolean;
+      type: string;
+    }>
+  }> {
+    const upcomingBillsData = await billRepository.findUpcomingBills({
+      userId,
+      days
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const bills = upcomingBillsData.map(bill => {
+      const billDate = new Date(bill.expirationDate!);
+      billDate.setHours(0, 0, 0, 0);
+
+      const daysUntilDue = Math.floor(
+        (billDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      const expirationDateStr = billDate
+        .toISOString()
+        .substring(0, 10);
+
+      return {
+        id: Number(bill.id),
+        name: bill.name,
+        amount: Number(bill.amount),
+        expirationDate: expirationDateStr,
+        daysUntilDue,
+        isRecurring: bill.isRecurring,
+        type: bill.type
+      };
+    });
+
+    return { bills };
+  }
+
+  async getTrendData({
+    userId,
+    months = 12
+  }: {
+    userId: number | string,
+    months?: number
+  }): Promise<{
+    series: Array<{
+      month: number,
+      year: number,
+      total: number,
+      recurring: number,
+      oneOff: number
+    }>
+  }> {
+    const allowedMonths = [3, 6, 12];
+    if (!allowedMonths.includes(months)) {
+      throw new Error("Parâmetro 'months' deve ser 3, 6 ou 12");
+    }
+
+    const trendData = await billRepository.getTrendData({
+      userId,
+      months
+    });
+
+    return { series: trendData };
+  }
 }

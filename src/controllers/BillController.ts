@@ -112,10 +112,70 @@ const pay = async (
   }
 }
 
+const getUpcoming = async (
+  req: TypedRequest<Params>,
+  res: Response
+) => {
+  try {
+    const params = paramsSchema.parse(req.params);
+    const days = req.query.days ? Number(req.query.days) : 15;
+
+    if (isNaN(days) || days < 1) {
+      return res.status(400).json({
+        message: "Parâmetro 'days' deve ser um número maior que 0"
+      });
+    }
+
+    const result = await billService.getUpcomingBills({
+      userId: params.userId,
+      days
+    });
+
+    res.status(200).json(result);
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Erro inesperado";
+    const statusCode = message.includes('não encontrado') ? 404 : 400;
+    return res.status(statusCode).json({
+      message: message
+    });
+  }
+}
+
+const getTrend = async (
+  req: TypedRequest<Params>,
+  res: Response
+) => {
+  try {
+    const params = paramsSchema.parse(req.params);
+    const months = req.query.months ? Number(req.query.months) : 12;
+
+    if (isNaN(months) || ![3, 6, 12].includes(months)) {
+      return res.status(400).json({
+        message: "Parâmetro 'months' deve ser 3, 6 ou 12"
+      });
+    }
+
+    const result = await billService.getTrendData({
+      userId: params.userId,
+      months
+    });
+
+    res.status(200).json(result);
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Erro inesperado";
+    const statusCode = message.includes('não encontrado') ? 404 : 400;
+    return res.status(statusCode).json({
+      message: message
+    });
+  }
+}
+
 export default {
   create,
   list,
   getBill,
   getBillMonthly,
-  pay
+  pay,
+  getUpcoming,
+  getTrend
 };

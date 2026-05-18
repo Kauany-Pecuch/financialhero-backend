@@ -37,7 +37,7 @@ describe("MetricsService", () => {
     id: "1",
     name: "Conta",
     amount: 100,
-    type: "AGUA",
+    type: "MORADIA",
     description: "Descrição",
     expirationDate: new Date(2026, 4, 15),
     userId: 1,
@@ -52,9 +52,9 @@ describe("MetricsService", () => {
   it("deve calcular métricas agrupadas por categoria", async () => {
     const user = makeUser();
     const bills = [
-      makeBill({ type: "AGUA", amount: 100 }),
-      makeBill({ id: "2", type: "LUZ", amount: 200 }),
-      makeBill({ id: "3", type: "AGUA", amount: 50 })
+      makeBill({ type: "MORADIA", amount: 100 }),
+      makeBill({ id: "2", type: "ALIMENTACAO", amount: 200 }),
+      makeBill({ id: "3", type: "MORADIA", amount: 50 })
     ];
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
@@ -68,8 +68,8 @@ describe("MetricsService", () => {
   it("deve somar corretamente totalAmount por categoria", async () => {
     const user = makeUser();
     const bills = [
-      makeBill({ type: "AGUA", amount: 100 }),
-      makeBill({ id: "2", type: "AGUA", amount: 50 })
+      makeBill({ type: "MORADIA", amount: 100 }),
+      makeBill({ id: "2", type: "MORADIA", amount: 50 })
     ];
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
@@ -77,8 +77,8 @@ describe("MetricsService", () => {
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
-    const agua = result.byCategory.find(m => m.category === "AGUA");
-    expect(agua?.totalAmount).toBe(150);
+    const moradia = result.byCategory.find(m => m.category === "MORADIA");
+    expect(moradia?.totalAmount).toBe(150);
   });
 
   it("deve calcular corretamente hoursNeeded", async () => {
@@ -90,8 +90,8 @@ describe("MetricsService", () => {
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
-    const agua = result.byCategory.find(m => m.category === "AGUA");
-    expect(agua?.hoursNeeded).toBe(10);
+    const moradia = result.byCategory.find(m => m.category === "MORADIA");
+    expect(moradia?.hoursNeeded).toBe(10);
   });
 
   it("deve arredondar hoursNeeded para 2 casas decimais", async () => {
@@ -103,16 +103,16 @@ describe("MetricsService", () => {
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
-    const agua = result.byCategory.find(m => m.category === "AGUA");
-    expect(agua?.hoursNeeded).toBe(24.6);
+    const moradia = result.byCategory.find(m => m.category === "MORADIA");
+    expect(moradia?.hoursNeeded).toBe(24.6);
   });
 
   it("deve calcular summary.totalAmount corretamente", async () => {
     const user = makeUser();
     const bills = [
       makeBill({ amount: 100 }),
-      makeBill({ id: "2", type: "LUZ", amount: 200 }),
-      makeBill({ id: "3", type: "CONDOMINIO", amount: 150 })
+      makeBill({ id: "2", type: "ALIMENTACAO", amount: 200 }),
+      makeBill({ id: "3", type: "SERVICOS", amount: 150 })
     ];
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
@@ -127,7 +127,7 @@ describe("MetricsService", () => {
     const user = makeUser({ wage: 8000 });
     const bills = [
       makeBill({ amount: 400 }),
-      makeBill({ id: "2", type: "LUZ", amount: 400 })
+      makeBill({ id: "2", type: "ALIMENTACAO", amount: 400 })
     ];
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
@@ -171,9 +171,9 @@ describe("MetricsService", () => {
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
-    const agua = result.byCategory.find(m => m.category === "AGUA");
-    expect(agua?.totalAmount).toBe(150);
-    expect(typeof agua?.totalAmount).toBe("number");
+    const moradia = result.byCategory.find(m => m.category === "MORADIA");
+    expect(moradia?.totalAmount).toBe(150);
+    expect(typeof moradia?.totalAmount).toBe("number");
   });
 
   it("deve chamar o banco com userId correto", async () => {

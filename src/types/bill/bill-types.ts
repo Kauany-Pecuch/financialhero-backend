@@ -1,10 +1,12 @@
 import { z } from "zod"
 
 export const BILL_TYPES = [
-  "LUZ",
-  "AGUA",
-  "CONDOMINIO",
-  "FINANCIAMENTO"
+  "MORADIA",
+  "ALIMENTACAO",
+  "SERVICOS",
+  "SAUDE",
+  "TRANSPORTE",
+  "OUTROS"
 ] as const;
 
 export type BillType = typeof BILL_TYPES[number];
