@@ -60,12 +60,24 @@ export default class BillRepository {
     const [property, direction] = validateSort({sort});
 
     const bills = await sequelize.query<Bill>(`
-        SELECT b.*
-        FROM bill b
-        WHERE b.user_id = :userId
-        ${ sort ? 'ORDER BY ' + property + ' ' + direction : ''}
-        LIMIT :pageSize
-        OFFSET :pageOffset
+          SELECT
+              b.id,
+              b.name,
+              b.type,
+              b.amount,
+              b.description,
+              b.active,
+              b.expiration_date AS "expirationDate",
+              b.is_paid          AS "isPaid",
+              b.recurring        AS "isRecurring",
+              b.user_id          AS "userId",
+              b.created_at       AS "createdAt",
+              b.updated_at       AS "updatedAt"
+          FROM bill b
+          WHERE b.user_id = :userId
+              ${ sort ? 'ORDER BY b.' + property + ' ' + direction : ''}
+          LIMIT :pageSize
+          OFFSET :pageOffset
       `,
       {
         replacements: {
