@@ -5,6 +5,6 @@ export const mailConfig = {
     pass: process.env.MAIL_PASS,
   },
   defaults: {
-    from: '"Financial Hero" <noreply@gmail.com>',
+    from: `"Financial Hero" <${process.env.MAIL_USER}>`,
   },
 } as const;
