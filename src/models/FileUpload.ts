@@ -50,7 +50,6 @@ export class FileUpload extends Model {
     const values = { ...this.get() };
 
     delete values.bill;
-    delete values.billId;
 
     return values;
   }
