@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BILL_TYPES } from "../bill/bill-types.js";
 
 export const metricsQuerySchema = z.object({
   month: z.string().refine((val) => {
@@ -13,22 +14,35 @@ export const metricsQuerySchema = z.object({
 
 export type MetricsQuery = z.infer<typeof metricsQuerySchema>;
 
-export type MetricsByCategory = {
-  category: string;
-  totalAmount: number;
-  hoursNeeded: number;
-};
+export const metricsByCategorySchema = z.object({
+  category: z.enum(BILL_TYPES),
+  totalAmount: z.number(),
+  hoursNeeded: z.number()
+});
 
-export type MetricsSummary = {
-  totalAmount: number;
-  totalHours: number;
-};
+export type MetricsByCategory = z.infer<typeof metricsByCategorySchema>;
 
-export type MetricsResponse = {
-  period: {
-    month: number;
-    year: number;
-  };
-  summary: MetricsSummary;
-  byCategory: MetricsByCategory[];
-};
+export const metricsSummarySchema = z.object({
+  totalAmount: z.number(),
+  totalHours: z.number(),
+  previousMonthTotal: z.number(),
+  percentChange: z.number(),
+  receiptsCount: z.number(),
+  recurring: z.number(),
+  oneOff: z.number()
+});
+
+export type MetricsSummary = z.infer<typeof metricsSummarySchema>;
+
+export const metricsResponseSchema = z.object({
+  period: z.object({
+    month: z.number(),
+    year: z.number()
+  }),
+
+  summary: metricsSummarySchema,
+
+  byCategory: z.array(metricsByCategorySchema)
+});
+
+export type MetricsResponse = z.infer<typeof metricsResponseSchema>;
