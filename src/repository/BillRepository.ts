@@ -127,6 +127,7 @@ export default class BillRepository {
           b.description,
           b.amount,
           b.name,
+          b.is_paid AS "isPaid",
           b.expiration_date AS "expirationDate",
           CASE m.month_num
               WHEN 1 THEN 'JANEIRO'
@@ -159,6 +160,7 @@ export default class BillRepository {
           b.description,
           b.amount,
           b.name,
+          b.is_paid AS "isPaid",
           b.expiration_date AS "expirationDate",
           CASE m.month_num
               WHEN 1 THEN 'JANEIRO'

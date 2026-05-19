@@ -53,6 +53,7 @@ export type MonthBills = {
   type: BillType;
   description: string;
   amount: number;
+  isPaid: boolean;
   name: string;
   expirationDate: Date;
   month: Month;
