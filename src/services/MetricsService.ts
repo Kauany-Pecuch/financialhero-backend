@@ -1,15 +1,22 @@
 import { Bill } from "../models/Bill.js";
 import { User } from "../models/User.js";
 import { AppError } from "../errors/AppError.js";
+import MetricsRepository from "../repository/MetricsRepository.js";
+
 import type {
   MetricsResponse,
   MetricsByCategory,
   MetricsSummary
 } from "../types/metrics/metrics-types.js";
-import { Op } from "sequelize";
 
 export default class MetricsService {
   private readonly HOURS_PER_MONTH = 200;
+
+  private metricsRepository: MetricsRepository;
+
+  constructor() {
+    this.metricsRepository = new MetricsRepository();
+  }
 
   async getMetrics(
     userId: number,
@@ -31,25 +38,54 @@ export default class MetricsService {
 
     const hourlyRate = wage / this.HOURS_PER_MONTH;
 
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
-
-    const bills = await Bill.findAll({
-      where: {
-        userId,
-        expirationDate: {
-          [Op.between]: [startDate, endDate]
-        }
-      }
+    const bills = await this.metricsRepository.getBillsByDateRange({
+      userId,
+      month,
+      year
     });
 
+    const previousMonthTotal =
+      await this.metricsRepository.getPreviousMonthTotal({
+        userId,
+        month,
+        year
+      });
+
+    const receiptsCount =
+      await this.metricsRepository.getReceiptsCount({
+        userId,
+        month,
+        year
+      });
+
+    const metricsSummary =
+      await this.metricsRepository.getMetricsSummary({
+        userId,
+        month,
+        year
+      });
+
     if (bills.length === 0) {
-      return this.buildEmptyResponse(month, year);
+      return this.buildEmptyResponse(
+        month,
+        year,
+        previousMonthTotal,
+        receiptsCount,
+        metricsSummary.recurring,
+        metricsSummary.oneOff
+      );
     }
 
     const grouped = this.groupByCategory(bills);
     const byCategory = this.calculateByCategory(grouped, hourlyRate);
-    const summary = this.calculateSummary(byCategory);
+
+    const summary = this.calculateSummary(
+      byCategory,
+      previousMonthTotal,
+      receiptsCount,
+      metricsSummary.recurring,
+      metricsSummary.oneOff
+    );
 
     return {
       period: { month, year },
@@ -89,7 +125,7 @@ export default class MetricsService {
       const totalAmount = amounts.reduce((sum, val) => sum + val, 0);
 
       result.push({
-        category,
+        category: category as MetricsByCategory["category"],
         totalAmount,
         hoursNeeded: this.round(totalAmount / hourlyRate)
       });
@@ -98,13 +134,38 @@ export default class MetricsService {
     return result.sort((a, b) => a.category.localeCompare(b.category));
   }
 
-  private calculateSummary(byCategory: MetricsByCategory[]): MetricsSummary {
+  private calculateSummary(
+    byCategory: MetricsByCategory[],
+    previousMonthTotal: number,
+    receiptsCount: number,
+    recurring: number,
+    oneOff: number
+  ): MetricsSummary {
+
     const totalAmount = byCategory.reduce((sum, item) => sum + item.totalAmount, 0);
+
     const totalHours = byCategory.reduce((sum, item) => sum + item.hoursNeeded, 0);
+
+    const percentChange =
+      previousMonthTotal === 0
+        ? 0
+        : Number(
+          (
+            (
+              (totalAmount - previousMonthTotal)
+              / previousMonthTotal
+            ) * 100
+          ).toFixed(2)
+        );
 
     return {
       totalAmount,
-      totalHours: this.round(totalHours)
+      totalHours: this.round(totalHours),
+      previousMonthTotal,
+      percentChange,
+      receiptsCount,
+      recurring,
+      oneOff
     };
   }
 
@@ -112,12 +173,35 @@ export default class MetricsService {
     return Math.round(value * 100) / 100;
   }
 
-  private buildEmptyResponse(month: number, year: number): MetricsResponse {
+  private buildEmptyResponse(
+    month: number,
+    year: number,
+    previousMonthTotal: number,
+    receiptsCount: number,
+    recurring: number,
+    oneOff: number
+  ): MetricsResponse {
+
+    const percentChange =
+      previousMonthTotal === 0
+        ? 0
+        : Number(
+          (
+            (-previousMonthTotal / previousMonthTotal) * 100
+          ).toFixed(2)
+        );
+
     return {
       period: { month, year },
+
       summary: {
         totalAmount: 0,
-        totalHours: 0
+        totalHours: 0,
+        previousMonthTotal,
+        percentChange,
+        receiptsCount,
+        recurring,
+        oneOff
       },
       byCategory: []
     };

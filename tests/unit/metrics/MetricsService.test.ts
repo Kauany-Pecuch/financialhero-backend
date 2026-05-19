@@ -4,25 +4,37 @@ vi.mock("../../../src/db.ts", () => ({
   default: {}
 }));
 
-vi.mock("../../../src/models/Bill.js", () => ({
-  Bill: {
-    findAll: vi.fn()
-  }
-}));
-
 vi.mock("../../../src/models/User.js", () => ({
   User: {
     findByPk: vi.fn()
   }
 }));
 
+vi.mock("../../../src/models/FileUpload.js", () => ({
+  FileUpload: {
+    count: vi.fn()
+  }
+}));
+
+vi.mock("../../../src/repository/MetricsRepository.js", () => {
+  return {
+    default: class MetricsRepository {
+      getBillsByDateRange = vi.fn();
+      getPreviousMonthTotal = vi.fn();
+      getReceiptsCount = vi.fn();
+      getMetricsSummary = vi.fn();
+    }
+  };
+});
+
 import { describe, it, expect, beforeEach } from "vitest";
 import MetricsService from "../../../src/services/MetricsService.js";
-import { Bill } from "../../../src/models/Bill.js";
 import { User } from "../../../src/models/User.js";
+import { FileUpload } from "../../../src/models/FileUpload.js";
 
 describe("MetricsService", () => {
   let metricsService: MetricsService;
+  let metricsRepository: any;
 
   const makeUser = (override = {}) => ({
     id: 1,
@@ -46,7 +58,18 @@ describe("MetricsService", () => {
 
   beforeEach(() => {
     metricsService = new MetricsService();
+    metricsRepository = (metricsService as any).metricsRepository;
+
     vi.clearAllMocks();
+
+    vi.mocked(FileUpload.count).mockResolvedValue(0 as any);
+
+    metricsRepository.getPreviousMonthTotal.mockResolvedValue(0);
+    metricsRepository.getReceiptsCount.mockResolvedValue(0);
+    metricsRepository.getMetricsSummary.mockResolvedValue({
+      recurring: 0,
+      oneOff: 0
+    });
   });
 
   it("deve calcular métricas agrupadas por categoria", async () => {
@@ -58,7 +81,7 @@ describe("MetricsService", () => {
     ];
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
-    vi.mocked(Bill.findAll).mockResolvedValue(bills as any);
+    metricsRepository.getBillsByDateRange.mockResolvedValue(bills);
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
@@ -73,7 +96,7 @@ describe("MetricsService", () => {
     ];
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
-    vi.mocked(Bill.findAll).mockResolvedValue(bills as any);
+    metricsRepository.getBillsByDateRange.mockResolvedValue(bills);
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
@@ -86,7 +109,7 @@ describe("MetricsService", () => {
     const bills = [makeBill({ amount: 400 })];
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
-    vi.mocked(Bill.findAll).mockResolvedValue(bills as any);
+    metricsRepository.getBillsByDateRange.mockResolvedValue(bills);
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
@@ -99,7 +122,7 @@ describe("MetricsService", () => {
     const bills = [makeBill({ amount: 123 })];
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
-    vi.mocked(Bill.findAll).mockResolvedValue(bills as any);
+    metricsRepository.getBillsByDateRange.mockResolvedValue(bills);
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
@@ -116,7 +139,7 @@ describe("MetricsService", () => {
     ];
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
-    vi.mocked(Bill.findAll).mockResolvedValue(bills as any);
+    metricsRepository.getBillsByDateRange.mockResolvedValue(bills);
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
@@ -131,7 +154,7 @@ describe("MetricsService", () => {
     ];
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
-    vi.mocked(Bill.findAll).mockResolvedValue(bills as any);
+    metricsRepository.getBillsByDateRange.mockResolvedValue(bills);
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
@@ -142,7 +165,7 @@ describe("MetricsService", () => {
     const user = makeUser();
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
-    vi.mocked(Bill.findAll).mockResolvedValue([]);
+    metricsRepository.getBillsByDateRange.mockResolvedValue([]);
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
@@ -167,7 +190,7 @@ describe("MetricsService", () => {
     ];
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
-    vi.mocked(Bill.findAll).mockResolvedValue(bills as any);
+    metricsRepository.getBillsByDateRange.mockResolvedValue(bills);
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
@@ -180,30 +203,74 @@ describe("MetricsService", () => {
     const user = makeUser({ id: 123 });
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
-    vi.mocked(Bill.findAll).mockResolvedValue([]);
+    metricsRepository.getBillsByDateRange.mockResolvedValue([]);
 
     await metricsService.getMetrics(123, 5, 2026);
 
-    const calls = vi.mocked(Bill.findAll).mock.calls;
-
-    expect(calls.length).toBeGreaterThan(0);
-
-    const call = calls[0];
-
-    if (call && call[0]) {
-      expect(call[0].where).toHaveProperty("userId", 123);
-    }
+    expect(metricsRepository.getBillsByDateRange).toHaveBeenCalledWith({
+      userId: 123,
+      month: 5,
+      year: 2026
+    });
   });
 
   it("deve retornar o período correto", async () => {
     const user = makeUser();
 
     vi.mocked(User.findByPk).mockResolvedValue(user as any);
-    vi.mocked(Bill.findAll).mockResolvedValue([]);
+    metricsRepository.getBillsByDateRange.mockResolvedValue([]);
 
     const result = await metricsService.getMetrics(1, 5, 2026);
 
     expect(result.period.month).toBe(5);
     expect(result.period.year).toBe(2026);
+  });
+
+  it("deve calcular percentChange corretamente", async () => {
+    const user = makeUser();
+
+    vi.mocked(User.findByPk).mockResolvedValue(user as any);
+
+    metricsRepository.getBillsByDateRange.mockResolvedValue([
+      makeBill({ amount: 200 })
+    ]);
+
+    metricsRepository.getPreviousMonthTotal.mockResolvedValue(100);
+
+    const result = await metricsService.getMetrics(1, 5, 2026);
+
+    expect(result.summary.percentChange).toBe(100);
+  });
+
+  it("deve retornar receiptsCount corretamente", async () => {
+    const user = makeUser();
+
+    vi.mocked(User.findByPk).mockResolvedValue(user as any);
+
+    metricsRepository.getBillsByDateRange.mockResolvedValue([]);
+
+    metricsRepository.getReceiptsCount.mockResolvedValue(5);
+
+    const result = await metricsService.getMetrics(1, 5, 2026);
+
+    expect(result.summary.receiptsCount).toBe(5);
+  });
+
+  it("deve retornar recurring e oneOff corretamente", async () => {
+    const user = makeUser();
+
+    vi.mocked(User.findByPk).mockResolvedValue(user as any);
+
+    metricsRepository.getBillsByDateRange.mockResolvedValue([]);
+
+    metricsRepository.getMetricsSummary.mockResolvedValue({
+      recurring: 3,
+      oneOff: 2
+    });
+
+    const result = await metricsService.getMetrics(1, 5, 2026);
+
+    expect(result.summary.recurring).toBe(3);
+    expect(result.summary.oneOff).toBe(2);
   });
 });
