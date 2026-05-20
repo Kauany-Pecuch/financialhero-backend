@@ -14,7 +14,9 @@ export default class FileUploadService {
   async createFileUpload(
     billId: number,
     file: Express.Multer.File,
-    type: TipoArquivo
+    type: TipoArquivo,
+    year?: number,
+    month?: number
   ): Promise<FileUpload> {
     const bill = await Bill.findByPk(billId);
     if (!bill) {
@@ -23,14 +25,19 @@ export default class FileUploadService {
 
     const b64 = await getFileHash(file);
 
+    const duplicateWhere: Record<string, unknown> = {
+      hash: b64,
+      billId,
+    };
+    if (year !== undefined) duplicateWhere.year = year;
+    if (month !== undefined) duplicateWhere.month = month;
+
     const existingFile = await FileUpload.findOne({
-      where: {
-        hash: b64
-      }
+      where: duplicateWhere,
     });
 
     if (existingFile) {
-      throw new AppError("Arquivo já existente no sistema.")
+      throw new AppError("Esse arquivo já foi anexado nesta conta/mês.");
     }
 
     return await FileUpload.create({
@@ -39,6 +46,8 @@ export default class FileUploadService {
       hash: b64,
       type: type,
       path: file.path.replace(/\\/g, "/"),
+      year: year ?? null,
+      month: month ?? null,
     });
   }
   
@@ -67,17 +76,14 @@ export default class FileUploadService {
     }:{
       search?: string | null;
       billId?: number | null;
-      type: TipoArquivo;
+      type?: TipoArquivo;
     }
   ): Promise<FileUpload[]> {
-    const params: { search?: string | null; billId?: number | null; type: TipoArquivo } = {
-      type,
+    const params: { search?: string | null; billId?: number | null; type?: TipoArquivo } = {
       search: search ?? null
     };
-
-    if (billId !== undefined) {
-      params.billId = billId;
-    }
+    if (type !== undefined) params.type = type;
+    if (billId !== undefined) params.billId = billId;
 
     return await fileUploadRepository.findAllFiles(params);
   }

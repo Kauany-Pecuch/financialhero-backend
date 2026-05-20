@@ -2,6 +2,7 @@ import {type Model, type ModelCtor, Sequelize} from "sequelize-typescript";
 import dotenv from "dotenv";
 import {User} from "./models/User.js";
 import {Bill} from "./models/Bill.js";
+import {BillPayment} from "./models/BillPayment.js";
 import {FileUpload} from "./models/FileUpload.js";
 
 dotenv.config();
@@ -17,6 +18,7 @@ if (!DB_NAME || !DB_USER || !DB_PASSWORD || !DB_HOST || !DB_PORT) {
 const models: ModelCtor<Model<any, any>>[] = [
   User,
   Bill,
+  BillPayment,
   FileUpload
 ]
 

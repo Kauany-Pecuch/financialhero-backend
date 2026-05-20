@@ -41,12 +41,34 @@ const list = async (
     const query = paginationSchema.parse(req.query);
     const params = paramsSchema.parse(req.params);
 
-    const body = await billService.listBill({
+    const rawYear = req.query.year;
+    const rawMonth = req.query.month;
+    const yearNum = rawYear !== undefined ? Number(rawYear) : undefined;
+    const monthNum = rawMonth !== undefined ? Number(rawMonth) : undefined;
+
+    if (
+      (yearNum !== undefined && !Number.isFinite(yearNum)) ||
+      (monthNum !== undefined && (!Number.isFinite(monthNum) || monthNum < 1 || monthNum > 12))
+    ) {
+      return res.status(400).json({ message: "year/month inválidos" });
+    }
+
+    const listArgs = {
       userId: params.userId,
       page: Number(query.page),
       size: Number(query.size),
       sort: query.sort
-    });
+    } as {
+      userId: string;
+      page: number;
+      size: number;
+      sort: string | null | undefined;
+      year?: number;
+      month?: number;
+    };
+    if (yearNum !== undefined) listArgs.year = yearNum;
+    if (monthNum !== undefined) listArgs.month = monthNum;
+    const body = await billService.listBill(listArgs);
     return res.status(200).json(body);
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Erro inesperado";
@@ -100,8 +122,15 @@ const pay = async (
 ) => {
   try {
     const params = billParamsSchema.parse(req.params);
-    const { isPaid } = req.body as { isPaid: boolean };
-    const result = await billService.payBill(Number(params.billId), Number(params.userId), isPaid);
+    const body = req.body as { isPaid: boolean; year?: number; month?: number };
+    const { isPaid, year, month } = body;
+    const result = await billService.payBill(
+      Number(params.billId),
+      Number(params.userId),
+      isPaid,
+      year,
+      month
+    );
     res.status(200).json(result);
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Erro inesperado";

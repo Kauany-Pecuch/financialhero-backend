@@ -25,7 +25,13 @@ const upload = async (req: Request, res: Response) => {
 			throw new AppError("Arquivo nao enviado", 400, "FILE_REQUIRED");
 		}
 
-		const fileUpload = await fileUploadService.createFileUpload(billId, req.file, params.type);
+		const fileUpload = await fileUploadService.createFileUpload(
+			billId,
+			req.file,
+			params.type,
+			params.year,
+			params.month
+		);
 
 		return res.status(201).json(fileUpload);
   } catch (e: unknown) {
@@ -77,13 +83,10 @@ const download = async (req: TypedRequest, res: Response) => {
 const list = async (req: TypedRequest, res: Response) => {
 	try {
 		const { search, billId, type } = fileUploadQuerySchema.parse(req.query);
-		const listParams: { type: typeof type; billId?: number | null; search?: string | null } = { type };
-		if (billId !== undefined) {
-			listParams.billId = billId;
-		}
-		if (search !== undefined) {
-			listParams.search = search;
-		}
+		const listParams: { type?: NonNullable<typeof type>; billId?: number | null; search?: string | null } = {};
+		if (type !== undefined) listParams.type = type;
+		if (billId !== undefined) listParams.billId = billId;
+		if (search !== undefined) listParams.search = search;
 		const files = await fileUploadService.listFiles(listParams);
 
 		return res.status(200).json(files);

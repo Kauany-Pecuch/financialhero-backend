@@ -10,11 +10,10 @@ export default class FileUploadRepository {
   }: {
     search?: string | null;
     billId?: number | null;
-    type: TipoArquivo;
+    type?: TipoArquivo;
   }): Promise<FileUpload[]> {
-    const filters: Record<string, unknown> = {
-      type
-    };
+    const filters: Record<string, unknown> = {};
+    if (type !== undefined) filters.type = type;
 
     if (billId != null) {
       filters.billId = billId;

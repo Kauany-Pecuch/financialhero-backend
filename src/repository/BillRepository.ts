@@ -50,14 +50,20 @@ export default class BillRepository {
     userId,
     page,
     size,
-    sort
+    sort,
+    year,
+    month
   }:{
     userId: string,
     page: number,
     size: number,
-    sort: string | null
+    sort: string | null,
+    year?: number,
+    month?: number
   }): Promise<Bill[]> {
     const [property, direction] = validateSort({sort});
+
+    const hasContext = year !== undefined && month !== undefined;
 
     const bills = await sequelize.query<Bill>(`
           SELECT
@@ -68,12 +74,22 @@ export default class BillRepository {
               b.description,
               b.active,
               b.expiration_date AS "expirationDate",
-              b.is_paid          AS "isPaid",
+              CASE
+                WHEN b.recurring = true AND :hasContext = true
+                  THEN COALESCE(bp.is_paid, false)
+                ELSE b.is_paid
+              END                AS "isPaid",
               b.recurring        AS "isRecurring",
               b.user_id          AS "userId",
               b.created_at       AS "createdAt",
               b.updated_at       AS "updatedAt"
           FROM bill b
+          LEFT JOIN bill_payment bp
+            ON :hasContext = true
+           AND b.recurring = true
+           AND bp.bill_id = b.id
+           AND bp.year = :year
+           AND bp.month = :month
           WHERE b.user_id = :userId
               ${ sort ? 'ORDER BY b.' + property + ' ' + direction : ''}
           LIMIT :pageSize
@@ -84,6 +100,9 @@ export default class BillRepository {
           userId: userId,
           pageOffset: page * size,
           pageSize: size,
+          hasContext,
+          year: year ?? 0,
+          month: month ?? 0,
         },
         type: QueryTypes.SELECT
       }
@@ -121,13 +140,14 @@ export default class BillRepository {
     const monthNumbers = months.map(m => MONTH_TO_NUMBER[m]);
 
     return await sequelize.query<MonthBills>(`
-      -- recorrentes (replica para todos os meses)
+      -- recorrentes (replica para todos os meses, com pagamento por mês)
       SELECT
+          b.id,
           b.type,
           b.description,
           b.amount,
           b.name,
-          b.is_paid AS "isPaid",
+          COALESCE(bp.is_paid, false) AS "isPaid",
           b.expiration_date AS "expirationDate",
           CASE m.month_num
               WHEN 1 THEN 'JANEIRO'
@@ -148,14 +168,21 @@ export default class BillRepository {
       JOIN LATERAL (
           SELECT unnest($monthNumbers::int[]) AS month_num
       ) m ON true
+      LEFT JOIN bill_payment bp
+        ON bp.bill_id = b.id
+       AND bp.year = $year::int
+       AND bp.month = m.month_num
       WHERE b.user_id = $userId
         AND b.recurring = true
         AND b.active = true
-  
+        AND MAKE_DATE($year::int, m.month_num::int, 1)
+              >= DATE_TRUNC('month', b.expiration_date)::date
+
       UNION ALL
-  
+
       -- não recorrentes (só no mês correto)
       SELECT
+          b.id,
           b.type,
           b.description,
           b.amount,
@@ -201,14 +228,9 @@ export default class BillRepository {
   }: {
     userId: number | string,
     days?: number
-  }): Promise<Bill[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  }): Promise<Array<Bill & { daysUntilDue: number }>> {
 
-    const endDate = new Date(today);
-    endDate.setDate(endDate.getDate() + days);
-
-    const bills = await sequelize.query<Bill>(`
+    const bills = await sequelize.query<Bill & { daysUntilDue: number }>(`
         SELECT
             b.id,
             b.name,
@@ -216,25 +238,33 @@ export default class BillRepository {
             b.amount,
             b.description,
             b.active,
-            b.expiration_date AS "expirationDate",
-            b.is_paid          AS "isPaid",
+            b.expiration_date  AS "expirationDate",
             b.recurring        AS "isRecurring",
             b.user_id          AS "userId",
             b.created_at       AS "createdAt",
-            b.updated_at       AS "updatedAt"
+            b.updated_at       AS "updatedAt",
+            (b.expiration_date::date - CURRENT_DATE) AS "daysUntilDue"
         FROM bill b
+        LEFT JOIN bill_payment bp
+          ON b.recurring = true
+         AND bp.bill_id = b.id
+         AND bp.year  = EXTRACT(YEAR  FROM CURRENT_DATE)::int
+         AND bp.month = EXTRACT(MONTH FROM CURRENT_DATE)::int
         WHERE b.user_id = :userId
-          AND b.is_paid = false
           AND b.active = true
-          AND b.expiration_date >= :today
-          AND b.expiration_date <= :endDate
+          AND b.expiration_date::date >= CURRENT_DATE
+          AND b.expiration_date::date <= CURRENT_DATE + CAST(:days AS INTEGER)
+          AND (
+            (b.recurring = false AND b.is_paid = false)
+            OR
+            (b.recurring = true AND COALESCE(bp.is_paid, false) = false)
+          )
         ORDER BY b.expiration_date ASC
       `,
       {
         replacements: {
           userId: userId,
-          today: today,
-          endDate: endDate
+          days: days
         },
         type: QueryTypes.SELECT
       }
@@ -257,13 +287,19 @@ export default class BillRepository {
     oneOff: number
   }>> {
     const today = new Date();
-    const startDate = new Date(today);
-    startDate.setMonth(startDate.getMonth() - (months - 1));
-    startDate.setDate(1);
-    startDate.setHours(0, 0, 0, 0);
+    const startDate = new Date(
+      today.getFullYear(),
+      today.getMonth() - (months - 1),
+      1,
+      0, 0, 0, 0
+    );
 
-    const endDate = new Date(today);
-    endDate.setHours(23, 59, 59, 999);
+    const endDate = new Date(
+      today.getFullYear(),
+      today.getMonth() + 1,
+      0,
+      23, 59, 59, 999
+    );
 
     const results = await sequelize.query<{
       month: number,

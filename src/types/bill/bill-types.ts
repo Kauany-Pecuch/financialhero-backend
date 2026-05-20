@@ -50,6 +50,7 @@ export const monthlyBillParams = z.object({
 export type MonthlyBillParams = z.infer<typeof monthlyBillParams>;
 
 export type MonthBills = {
+  id: number;
   type: BillType;
   description: string;
   amount: number;
