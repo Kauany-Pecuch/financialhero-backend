@@ -48,10 +48,11 @@ const update: RequestHandler = async (
     const { userId } = _req.params;
     const body = _req.body;
 
-    const updatedData = await userService.updateUser(Number(userId), body);
+    const { user, token } = await userService.updateUser(Number(userId), body);
 
     return res.status(200).json({
-      data: updatedData,
+      data: user,
+      token,
       message: "Perfil atualizado com sucesso!"
     });
   } catch (e: unknown) {

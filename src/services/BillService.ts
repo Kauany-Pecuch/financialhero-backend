@@ -1,4 +1,5 @@
 import {Bill} from "../models/Bill.js";
+import {BillPayment} from "../models/BillPayment.js";
 import {User} from "../models/User.js";
 import {
   type CreateBillRequest,
@@ -49,15 +50,30 @@ export default class BillService {
     userId,
     page = 0,
     size = 10,
-    sort = "created_at,desc"
+    sort = "created_at,desc",
+    year,
+    month
   } : {
     userId: string,
     page: number,
     size: number,
-    sort: string | null | undefined
+    sort: string | null | undefined,
+    year?: number | undefined,
+    month?: number | undefined
   }): Promise<PagedResponse<Bill>> {
+    const repoArgs: {
+      userId: string;
+      page: number;
+      size: number;
+      sort: string | null;
+      year?: number;
+      month?: number;
+    } = { userId, page, size, sort: sort ?? null };
+    if (year !== undefined) repoArgs.year = year;
+    if (month !== undefined) repoArgs.month = month;
+
     const [resultList, totalItems] = await Promise.all([
-        billRepository.findAllBillsByUserId({userId, page, size, sort}),
+        billRepository.findAllBillsByUserId(repoArgs),
         billRepository.countItemsByUserId(userId)
     ]);
 
@@ -120,13 +136,51 @@ export default class BillService {
     return grouped;
   }
 
-  async payBill(billId: number, userId: number, isPaid: boolean): Promise<{ message: string }> {
+  async payBill(
+    billId: number,
+    userId: number,
+    isPaid: boolean,
+    year?: number,
+    month?: number
+  ): Promise<{ message: string }> {
     const bill = await Bill.findOne({ where: { id: billId, userId } });
     if (!bill) {
       throw new AppError("Conta não encontrada", 404);
     }
-    
-    await bill.update({ isPaid });
+
+    if (bill.isRecurring) {
+      if (year === undefined || month === undefined) {
+        throw new AppError(
+          "Mês e ano são obrigatórios para pagar contas recorrentes",
+          400
+        );
+      }
+      if (month < 1 || month > 12) {
+        throw new AppError("Mês inválido", 400);
+      }
+
+      const existing = await BillPayment.findOne({
+        where: { billId, year, month },
+      });
+
+      if (existing) {
+        await existing.update({
+          isPaid,
+          paidAt: isPaid ? new Date() : null,
+        });
+      } else {
+        await BillPayment.create({
+          billId,
+          year,
+          month,
+          isPaid,
+          paidAt: isPaid ? new Date() : null,
+        });
+      }
+    } else {
+      await bill.update({ isPaid });
+    }
+
     return { message: `Conta ${isPaid ? 'marcada como paga' : 'desmarcada como paga'} com sucesso` };
   }
   async getUpcomingBills({
@@ -151,27 +205,16 @@ export default class BillService {
       days
     });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const bills = upcomingBillsData.map(bill => {
       const billDate = new Date(bill.expirationDate!);
-      billDate.setHours(0, 0, 0, 0);
-
-      const daysUntilDue = Math.floor(
-        (billDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      const expirationDateStr = billDate
-        .toISOString()
-        .substring(0, 10);
+      const expirationDateStr = billDate.toISOString().substring(0, 10);
 
       return {
         id: Number(bill.id),
         name: bill.name,
         amount: Number(bill.amount),
         expirationDate: expirationDateStr,
-        daysUntilDue,
+        daysUntilDue: Number(bill.daysUntilDue),
         isRecurring: bill.isRecurring,
         type: bill.type
       };

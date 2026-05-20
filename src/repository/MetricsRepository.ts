@@ -130,8 +130,8 @@ export default class MetricsRepository {
         EXTRACT(MONTH FROM expiration_date) as month,
         EXTRACT(YEAR FROM expiration_date) as year,
         SUM(amount) as total,
-        SUM(CASE WHEN is_recurring = true THEN 1 ELSE 0 END) as recurring,
-        SUM(CASE WHEN is_recurring = false THEN 1 ELSE 0 END) as oneOff
+        SUM(CASE WHEN recurring = true THEN 1 ELSE 0 END) as recurring,
+        SUM(CASE WHEN recurring = false THEN 1 ELSE 0 END) as oneOff
       FROM bill
       WHERE user_id = :userId
         AND expiration_date >= :startDate

@@ -34,6 +34,20 @@ export class FileUpload extends Model {
   })
   path!: string;
 
+  @Column({
+    type: DataType.INTEGER,
+    field: "year",
+    allowNull: true,
+  })
+  year!: number | null;
+
+  @Column({
+    type: DataType.INTEGER,
+    field: "month",
+    allowNull: true,
+  })
+  month!: number | null;
+
   @ForeignKey(() => Bill)
   @Column({
     type: DataType.INTEGER,
