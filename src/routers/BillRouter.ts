@@ -11,5 +11,6 @@ routes.get('/:userId/trend', validateToken, BillController.getTrend);
 routes.get('/:userId/bill/:billId', validateToken, BillController.getBill);
 routes.get('/:userId/monthly', validateToken, BillController.getBillMonthly);
 routes.put('/:userId/bill/:billId/pay', validateToken, BillController.pay);
+routes.delete('/:userId/bill/:billId', validateToken, BillController.deleteBill);
 
 export default routes;
