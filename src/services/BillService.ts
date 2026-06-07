@@ -5,7 +5,6 @@ import {
   type CreateBillRequest,
   type MonthlyBillParams,
   type Month,
-  MONTH,
   type MonthBills
 } from "../types/bill/bill-types.js";
 import type {PagedResponse} from "../types/requests.js";
@@ -221,6 +220,23 @@ export default class BillService {
     });
 
     return { bills };
+  }
+
+  async deleteBill(userId: string, billId: string): Promise<{ message: string }> {
+    const bill = await Bill.findOne({
+      where: {
+        id: billId,
+        userId: userId
+      }
+    });
+
+    if (!bill) {
+      throw new AppError("Conta não encontrada", 404);
+    }
+
+    await bill.destroy();
+
+    return { message: "Conta deletada com sucesso" };
   }
 
   async getTrendData({
