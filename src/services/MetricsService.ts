@@ -1,7 +1,6 @@
-import { Bill } from "../models/Bill.js";
 import { User } from "../models/User.js";
 import { AppError } from "../errors/AppError.js";
-import MetricsRepository from "../repository/MetricsRepository.js";
+import MetricsRepository, { type BillAmountRow } from "../repository/MetricsRepository.js";
 
 import type {
   MetricsResponse,
@@ -94,7 +93,7 @@ export default class MetricsService {
     };
   }
 
-  private groupByCategory(bills: Bill[]): Map<string, number[]> {
+  private groupByCategory(bills: BillAmountRow[]): Map<string, number[]> {
     const grouped = new Map<string, number[]>();
 
     for (const bill of bills) {

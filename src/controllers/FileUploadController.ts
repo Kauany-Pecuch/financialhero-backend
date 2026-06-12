@@ -80,6 +80,32 @@ const download = async (req: TypedRequest, res: Response) => {
 	}
 };
 
+const remove = async (req: TypedRequest, res: Response) => {
+	try {
+		const { fileId } = fileIdSchema.parse(req.params);
+		const result = await fileUploadService.deleteFile(fileId);
+
+		return res.status(200).json(result);
+	} catch (e: unknown) {
+		if (!(e instanceof AppError) && !(e instanceof z.ZodError)) {
+			logger.error({ err: e, path: req.originalUrl, method: req.method }, "Falha ao excluir arquivo");
+		}
+
+		const error =
+			e instanceof AppError
+				? e
+				: e instanceof z.ZodError
+					? new AppError("Parametro fileId invalido", 400, "INVALID_FILE_ID")
+					: new AppError("Erro ao excluir o arquivo", 500, "DELETE_FILE_ERROR");
+
+		return res.status(error.statusCode).json({
+			message: error.message,
+			code: error.code,
+			details: error.details,
+		});
+	}
+};
+
 const list = async (req: TypedRequest, res: Response) => {
 	try {
 		const { search, billId, type } = fileUploadQuerySchema.parse(req.query);
@@ -113,5 +139,6 @@ const list = async (req: TypedRequest, res: Response) => {
 export default {
   upload,
 	download,
-	list
+	list,
+	remove
 };

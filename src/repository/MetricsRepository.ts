@@ -1,20 +1,38 @@
 import sequelize from "../db.js";
-import { QueryTypes, Op } from "sequelize";
-import { Bill } from "../models/Bill.js";
-import { FileUpload } from "../models/FileUpload.js";
+import { QueryTypes } from "sequelize";
 
-type MetricsSummaryRaw = {
-  month: number;
-  year: number;
-  total: string;
+export type BillAmountRow = {
+  type: string;
+  amount: string | number;
+};
+
+type SummaryRaw = {
   recurring: string | number;
   oneOff: string | number;
 };
 
-type MetricsSummaryResult = {
-  recurring: number;
-  oneOff: number;
-};
+type SumRaw = { total: string | number };
+type CountRaw = { count: string | number };
+
+// Um gasto pertence ao mês (:year, :month) quando:
+//  - é recorrente e ativo, e a recorrência já começou até aquele mês
+//    (mesma regra usada no calendário / findAllBillByMonths); ou
+//  - é avulso e vence exatamente naquele mês.
+const BILL_IN_MONTH = `
+  (
+    (
+      b.recurring = true
+      AND b.active = true
+      AND MAKE_DATE(:year, :month, 1) >= DATE_TRUNC('month', b.expiration_date)::date
+    )
+    OR
+    (
+      b.recurring = false
+      AND EXTRACT(YEAR FROM b.expiration_date) = :year
+      AND EXTRACT(MONTH FROM b.expiration_date) = :month
+    )
+  )
+`;
 
 export default class MetricsRepository {
 
@@ -26,18 +44,16 @@ export default class MetricsRepository {
     userId: number;
     month: number;
     year: number;
-  }): Promise<Bill[]> {
+  }): Promise<BillAmountRow[]> {
 
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
-
-    return await Bill.findAll({
-      where: {
-        userId,
-        expirationDate: {
-          [Op.between]: [startDate, endDate]
-        }
-      }
+    return await sequelize.query<BillAmountRow>(`
+      SELECT b.type, b.amount
+      FROM bill b
+      WHERE b.user_id = :userId
+        AND ${BILL_IN_MONTH}
+    `, {
+      replacements: { userId, month, year },
+      type: QueryTypes.SELECT
     });
   }
 
@@ -51,63 +67,51 @@ export default class MetricsRepository {
     year: number;
   }): Promise<number> {
 
-    const previousMonthStart = new Date(year, month - 2, 1);
-    const previousMonthEnd = new Date(year, month - 1, 0);
+    // Mês anterior, com virada de ano.
+    let prevMonth = month - 1;
+    let prevYear = year;
+    if (prevMonth === 0) {
+      prevMonth = 12;
+      prevYear = year - 1;
+    }
 
-    const previousMonthBills = await Bill.findAll({
-      where: {
-        userId,
-        expirationDate: {
-          [Op.between]: [previousMonthStart, previousMonthEnd]
-        }
-      }
+    const result = await sequelize.query<SumRaw>(`
+      SELECT COALESCE(SUM(b.amount), 0) AS total
+      FROM bill b
+      WHERE b.user_id = :userId
+        AND ${BILL_IN_MONTH}
+    `, {
+      replacements: { userId, month: prevMonth, year: prevYear },
+      type: QueryTypes.SELECT
     });
 
-    return previousMonthBills.reduce((sum, bill) => {
-
-      const amount =
-        typeof bill.amount === "string"
-          ? parseFloat(bill.amount)
-          : bill.amount;
-
-      return sum + amount;
-
-    }, 0);
+    return Number(result[0]?.total ?? 0);
   }
 
   async getReceiptsCount({
-    userId,
-    month,
-    year
+    userId
   }: {
     userId: number;
     month: number;
     year: number;
   }): Promise<number> {
 
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
-
     try {
-
-      const count = await FileUpload.count({
-        include: [
-          {
-            model: Bill,
-            where: {
-              userId,
-              expirationDate: {
-                [Op.between]: [startDate, endDate]
-              }
-            }
-          }
-        ]
+      // "documentos salvos": total de arquivos do usuário, incluindo
+      // comprovantes (COMPROVANTE) e faturas/cobranças (COBRANCA).
+      const result = await sequelize.query<CountRaw>(`
+        SELECT COUNT(*) AS count
+        FROM file_upload f
+        JOIN bill b ON b.id = f.bill_id
+        WHERE b.user_id = :userId
+      `, {
+        replacements: { userId },
+        type: QueryTypes.SELECT
       });
 
-      return count || 0;
+      return Number(result[0]?.count ?? 0);
 
     } catch {
-
       return 0;
     }
   }
@@ -120,49 +124,25 @@ export default class MetricsRepository {
     userId: number;
     month: number;
     year: number;
-  }): Promise<MetricsSummaryResult> {
+  }): Promise<{ recurring: number; oneOff: number }> {
 
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-
-    const result = await sequelize.query<MetricsSummaryRaw>(`
+    const result = await sequelize.query<SummaryRaw>(`
       SELECT
-        EXTRACT(MONTH FROM expiration_date) as month,
-        EXTRACT(YEAR FROM expiration_date) as year,
-        SUM(amount) as total,
-        SUM(CASE WHEN recurring = true THEN 1 ELSE 0 END) as recurring,
-        SUM(CASE WHEN recurring = false THEN 1 ELSE 0 END) as oneOff
-      FROM bill
-      WHERE user_id = :userId
-        AND expiration_date >= :startDate
-        AND expiration_date <= :endDate
-      GROUP BY
-        EXTRACT(YEAR FROM expiration_date),
-        EXTRACT(MONTH FROM expiration_date)
-      ORDER BY year ASC, month ASC
+        SUM(CASE WHEN b.recurring = true THEN 1 ELSE 0 END) AS recurring,
+        SUM(CASE WHEN b.recurring = false THEN 1 ELSE 0 END) AS "oneOff"
+      FROM bill b
+      WHERE b.user_id = :userId
+        AND ${BILL_IN_MONTH}
     `, {
-      replacements: {
-        userId,
-        startDate,
-        endDate
-      },
+      replacements: { userId, month, year },
       type: QueryTypes.SELECT
     });
 
-    let recurring = 0;
-    let oneOff = 0;
-
     const metrics = result[0];
 
-    if (metrics) {
-
-      recurring = Number(metrics.recurring) || 0;
-      oneOff = Number(metrics.oneOff) || 0;
-    }
-
     return {
-      recurring,
-      oneOff
+      recurring: Number(metrics?.recurring) || 0,
+      oneOff: Number(metrics?.oneOff) || 0
     };
   }
 }

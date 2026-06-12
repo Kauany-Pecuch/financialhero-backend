@@ -231,35 +231,70 @@ export default class BillRepository {
   }): Promise<Array<Bill & { daysUntilDue: number }>> {
 
     const bills = await sequelize.query<Bill & { daysUntilDue: number }>(`
+        WITH base AS (
+          SELECT
+            b.id, b.name, b.type, b.amount, b.description, b.active,
+            b.recurring, b.is_paid, b.user_id, b.created_at, b.updated_at,
+            -- Data de vencimento "efetiva":
+            --  - avulso: a própria data;
+            --  - recorrente cujo 1º vencimento ainda não chegou: a própria data;
+            --  - recorrente já iniciado: a próxima ocorrência (>= hoje), no mesmo
+            --    dia do mês (com clamp para meses mais curtos).
+            CASE
+              WHEN b.recurring = false THEN b.expiration_date::date
+              WHEN b.expiration_date::date >= (now() AT TIME ZONE 'America/Sao_Paulo')::date THEN b.expiration_date::date
+              WHEN (
+                date_trunc('month', (now() AT TIME ZONE 'America/Sao_Paulo')::date)::date
+                + (LEAST(
+                     EXTRACT(DAY FROM b.expiration_date)::int,
+                     EXTRACT(DAY FROM (date_trunc('month', (now() AT TIME ZONE 'America/Sao_Paulo')::date) + interval '1 month - 1 day'))::int
+                   ) - 1)
+              ) >= (now() AT TIME ZONE 'America/Sao_Paulo')::date THEN (
+                date_trunc('month', (now() AT TIME ZONE 'America/Sao_Paulo')::date)::date
+                + (LEAST(
+                     EXTRACT(DAY FROM b.expiration_date)::int,
+                     EXTRACT(DAY FROM (date_trunc('month', (now() AT TIME ZONE 'America/Sao_Paulo')::date) + interval '1 month - 1 day'))::int
+                   ) - 1)
+              )
+              ELSE (
+                (date_trunc('month', (now() AT TIME ZONE 'America/Sao_Paulo')::date) + interval '1 month')::date
+                + (LEAST(
+                     EXTRACT(DAY FROM b.expiration_date)::int,
+                     EXTRACT(DAY FROM (date_trunc('month', (now() AT TIME ZONE 'America/Sao_Paulo')::date) + interval '2 month - 1 day'))::int
+                   ) - 1)
+              )
+            END AS effective_due
+          FROM bill b
+          WHERE b.user_id = :userId
+            AND b.active = true
+        )
         SELECT
-            b.id,
-            b.name,
-            b.type,
-            b.amount,
-            b.description,
-            b.active,
-            b.expiration_date  AS "expirationDate",
-            b.recurring        AS "isRecurring",
-            b.user_id          AS "userId",
-            b.created_at       AS "createdAt",
-            b.updated_at       AS "updatedAt",
-            (b.expiration_date::date - CURRENT_DATE) AS "daysUntilDue"
-        FROM bill b
+            base.id,
+            base.name,
+            base.type,
+            base.amount,
+            base.description,
+            base.active,
+            base.effective_due AS "expirationDate",
+            base.recurring     AS "isRecurring",
+            base.user_id       AS "userId",
+            base.created_at    AS "createdAt",
+            base.updated_at    AS "updatedAt",
+            (base.effective_due - (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS "daysUntilDue"
+        FROM base
         LEFT JOIN bill_payment bp
-          ON b.recurring = true
-         AND bp.bill_id = b.id
-         AND bp.year  = EXTRACT(YEAR  FROM CURRENT_DATE)::int
-         AND bp.month = EXTRACT(MONTH FROM CURRENT_DATE)::int
-        WHERE b.user_id = :userId
-          AND b.active = true
-          AND b.expiration_date::date >= CURRENT_DATE
-          AND b.expiration_date::date <= CURRENT_DATE + CAST(:days AS INTEGER)
+          ON base.recurring = true
+         AND bp.bill_id = base.id
+         AND bp.year  = EXTRACT(YEAR  FROM base.effective_due)::int
+         AND bp.month = EXTRACT(MONTH FROM base.effective_due)::int
+        WHERE base.effective_due >= (now() AT TIME ZONE 'America/Sao_Paulo')::date
+          AND base.effective_due <= (now() AT TIME ZONE 'America/Sao_Paulo')::date + CAST(:days AS INTEGER)
           AND (
-            (b.recurring = false AND b.is_paid = false)
+            (base.recurring = false AND base.is_paid = false)
             OR
-            (b.recurring = true AND COALESCE(bp.is_paid, false) = false)
+            (base.recurring = true AND COALESCE(bp.is_paid, false) = false)
           )
-        ORDER BY b.expiration_date ASC
+        ORDER BY base.effective_due ASC
       `,
       {
         replacements: {

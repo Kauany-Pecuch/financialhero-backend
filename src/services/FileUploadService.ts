@@ -68,6 +68,22 @@ export default class FileUploadService {
     };
   }
 
+  async deleteFile(fileId: number): Promise<{ message: string }> {
+    const fileUpload = await FileUpload.findByPk(fileId);
+    if (!fileUpload) {
+      throw new AppError("Arquivo nao encontrado", 404, "FILE_NOT_FOUND");
+    }
+
+    const normalizedPath = path.normalize(fileUpload.path);
+    if (fs.existsSync(normalizedPath)) {
+      await fs.promises.unlink(normalizedPath);
+    }
+
+    await fileUpload.destroy();
+
+    return { message: "Arquivo excluído com sucesso" };
+  }
+
   async listFiles(
     {
       search,
